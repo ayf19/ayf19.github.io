@@ -40,7 +40,7 @@ external_link:
   exclude: ''
 filename_case: 0
 render_drafts: false
-post_asset_folder: false
+post_asset_folder: true
 relative_link: true
 future: true
 highlight:
@@ -96,8 +96,24 @@ ignore:
 
 # Extensions
 ## Plugins: https://hexo.io/plugins/
+search:
+  path: search.xml
+  field: post
+  format: html
+  limit: 10000
+
+symbols_count_time:
+  symbols: true
+  time: true
+  total_symbols: true
+  total_time: true
+  exclude_codeblock: false
+  awl: 4
+  wpm: 275
+  suffix: "分钟"
+
 ## Themes: https://hexo.io/themes/
-theme: landscape
+theme: next # landscape
 
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment

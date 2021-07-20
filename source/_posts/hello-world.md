@@ -1,38 +1,10 @@
 ---
-title: Hello World
+title: Hello World!
+date: 2021-07-20 14:16:39
+tags:
+categories: 更新日志
 ---
-Welcome to [Hexo](https://hexo.io/)! This is your very first post. Check [documentation](https://hexo.io/docs/) for more info. If you get any problems when using Hexo, you can find the answer in [troubleshooting](https://hexo.io/docs/troubleshooting.html) or you can ask me on [GitHub](https://github.com/hexojs/hexo/issues).
 
-## Quick Start
+写博客这件事情想了很久了，但是一直由于各种原因（主要还是懒）而咕咕咕，今天总算是勉强搭起来，还有很多细节工作需要做，~~甚至没有想好名字，~~所以写东西的事继续咕咕咕（×）
 
-### Create a new post
-
-``` bash
-$ hexo new "My New Post"
-```
-
-More info: [Writing](https://hexo.io/docs/writing.html)
-
-### Run server
-
-``` bash
-$ hexo server
-```
-
-More info: [Server](https://hexo.io/docs/server.html)
-
-### Generate static files
-
-``` bash
-$ hexo generate
-```
-
-More info: [Generating](https://hexo.io/docs/generating.html)
-
-### Deploy to remote sites
-
-``` bash
-$ hexo deploy
-```
-
-More info: [Deployment](https://hexo.io/docs/one-command-deployment.html)
+框架和主题都是现成的，但是昨天刚看了holder的blog今天就搭了看起来一模一样的东西也属实有些过分（虽然确实有些配置抄他的），但是主要原因是我想要一个白色背景来衬我的透明图头像，~~所以只能说如有雷同纯属巧合~~
