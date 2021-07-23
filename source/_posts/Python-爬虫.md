@@ -210,11 +210,13 @@ https://bbs.hupu.com/502-{PAGE}
 那么假如我们获取前10页的新闻详情链接：
 
 ```python
+url = 'https://bbs.hupu.com/'
 news_list = []
 
 for i in range(1, 11):
     response = get(f'https://bbs.hupu.com/502-{i}', headers={'Cookie': Cookie})
-    soup = soup.find_all('a', class_='p-title')
+    soup = BeautifulSoup(response.content.decode('utf-8'), 'lxml')
+    news = soup.find_all('a', class_='p-title')
     for n in news:
         news_list.append(urljoin(url, n.get('href')))
     sleep(0.02)   # 按照要求休息1/50秒
@@ -228,11 +230,10 @@ for i in range(1, 11):
 news_content = []
 
 for news_url in news_list:
-    response = get(news_url)
+    response = get(news_url, headers={'Cookie': Cookie})
     soup = BeautifulSoup(response.content.decode('utf-8'), 'lxml')
     title = soup.find('h1', class_='name').text.strip()
-    content = soup.find('div', class_='thread-content-detail').text
-              .strip().replace('\r', '\n')
+    content = soup.find('div', class_='thread-content-detail').text.strip().replace('\r', '\n')
     news_content.append({
         'url': news_url,
         'title': title,
