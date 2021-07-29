@@ -1,0 +1,17 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	ignorecase = true
+	precomposeunicode = true
+	quotepath = false
+[gui]
+   encoding = utf-8
+[i18n]
+   commitencoding = utf-8
+[svn]
+   pathnameencoding = utf-8
+[branch "master"]
+	remote = git@github.com:ayf19/ayf19.github.io.git
+	merge = refs/heads/master
