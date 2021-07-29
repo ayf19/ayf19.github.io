@@ -58,6 +58,9 @@ jobs:
       # 生成并部署
       - name: Deploy
         run: |
-          mv .gitconfig .git/config
+          git config --local core.quotepath false
+          git config --local gui.encoding utf-8
+          git config --local i18n.commitencoding utf-8
+          git config --local svn.pathnameencoding utf-8
           git ls-files | while read file; do touch -d $(git log -1 --format="%cI" "$file") "$file"; done
           npx hexo deploy --generate
