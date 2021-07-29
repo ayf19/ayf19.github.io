@@ -118,4 +118,8 @@ theme: next # landscape
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment
 deploy:
-  type: ''
+  type: 'git'
+  repo: git@github.com:ayf19/ayf19.github.io.git
+  branch: gh-pages
+  name: ayf19
+  email: ayf19@mails.tsinghua.edu.cn
