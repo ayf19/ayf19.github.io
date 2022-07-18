@@ -1,0 +1,520 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title>Python 爬虫</title>
+    <url>/2021/07/23/Python-%E7%88%AC%E8%99%AB/</url>
+    <content><![CDATA[<h3 id="0-前言"><a href="#0-前言" class="headerlink" title="0. 前言"></a>0. 前言</h3><p>今年的Python应用相比于去年扩充了更多的内容，因此爬虫的时间也需要压缩一些，好在爬虫本身的难度并不大，只是最好知道一些背景知识，但是这些背景（除了我即将提到的）并不太影响我们今天的内容，因此大家可以看 <a href="https://cloud.tsinghua.edu.cn/f/cf2c7ae3113c4369850f/">rls的课程</a>（的前半部分）自行了解。</p>
+<span id="more"></span>
+
+<h3 id="1-网络请求-amp-爬虫初步"><a href="#1-网络请求-amp-爬虫初步" class="headerlink" title="1. 网络请求 &amp; 爬虫初步"></a>1. 网络请求 &amp; 爬虫初步</h3><h4 id="1-1-终极哲学三大问（服务器视角下的网络请求）"><a href="#1-1-终极哲学三大问（服务器视角下的网络请求）" class="headerlink" title="1.1. 终极哲学三大问（服务器视角下的网络请求）"></a>1.1. 终极哲学三大问（服务器视角下的网络请求）</h4><p>爬虫为了（自动化地、常常还需要是高速地）获取服务器资源，首先应当了解向服务器发送请求时发生了什么。通常来说一次网络请求的主要内容包括：</p>
+<ul>
+<li>你是谁：User-Agent | Cookies</li>
+<li>你从哪里来：IP</li>
+<li>你来这里干什么：Method &amp; Parameter （如果是POST请求的话还会有更多内容，但是作为爬虫的话可以略微简化）</li>
+</ul>
+<p>在这一过程中服务器可能面临一些攻击（爬虫可能无意间导致这样的问题）：</p>
+<ul>
+<li>DoS (Denial of Service) attack：拒绝服务攻击，通过构造大量的（尤其是繁重的，也就是CC攻击）请求使得服务器“忙不过来”，让服务器无法正常服务；</li>
+<li>DDoS (Distributed Denial of Service) attack：分布式拒绝服务攻击，在DoS攻击的基础上改为多个客户端（<del>肉鸡</del>用户）同时对目标网站发起大量请求。</li>
+</ul>
+<p>尽管谈论攻击有点遥远，但是不妨考虑以下两个情景：</p>
+<ol>
+<li>当你准时到达查询高考成绩时</li>
+<li>当你双十一午夜十二点下单时</li>
+</ol>
+<p><strong>写爬虫时应该全力避免这种情况！</strong></p>
+<h4 id="1-2-网络抓包基本功"><a href="#1-2-网络抓包基本功" class="headerlink" title="1.2. 网络抓包基本功"></a>1.2. 网络抓包基本功</h4><blockquote>
+<p>浏览网⻚的本质是基于 HTTP 协议的一次或多次网络请求，这些请求用戶是可以直接查看的，比如按下 F12 再看看“网络”。</p>
+<p>——某一线主播</p>
+</blockquote>
+<p>网络抓包通常有如下用途：</p>
+<ol>
+<li>查看真正的数据来源（常为XHR）</li>
+<li>查看下载视频等数据</li>
+<li>模拟请求完成登录</li>
+<li><del>测试网站安全性</del></li>
+</ol>
+<p>其实对于写爬虫来说，主要用途只有一个，就是找到我们需要的数据的真正来源（当然如果使用selenium等方法加载网页内容可以不用分析数据来源，但是这样显然消耗更多资源且慢），稍后我们将会看到这一点。</p>
+<h4 id="1-3-何为爬-amp-为何爬"><a href="#1-3-何为爬-amp-为何爬" class="headerlink" title="1.3. 何为爬 &amp; 为何爬"></a>1.3. 何为爬 &amp; 为何爬</h4><p>这个想必大家都是懂的，写爬虫归根结底还是为了替代人工进行重复 or 大量的操作，如果非常不熟悉爬虫这种程序可以去看rls的课。</p>
+<h4 id="1-4-孰可爬"><a href="#1-4-孰可爬" class="headerlink" title="1.4. 孰可爬"></a>1.4. 孰可爬</h4><p>这部分是我们最重要的背景知识，爬网站之前请务必关注<strong>robots.txt</strong>（即域名+<code>/robots.txt</code>，要注意子域名的要求未必和主域名一样，切不可看到主域名可以爬就随便搞），这是网站与爬虫之间的“君子协议”，此处规定了什么可爬什么不可爬，下面是几个例子。</p>
+<h5 id="1-4-1-百度"><a href="#1-4-1-百度" class="headerlink" title="1.4.1. 百度"></a>1.4.1. 百度</h5><figure class="highlight text"><table><tr><td class="code"><pre><span class="line">User-agent: Baiduspider</span><br><span class="line">Disallow: /baidu</span><br><span class="line">Disallow: /s?</span><br><span class="line">Disallow: /ulink?</span><br><span class="line">Disallow: /link?</span><br><span class="line">Disallow: /home/news/data/</span><br><span class="line">Disallow: /bh</span><br><span class="line"></span><br><span class="line">User-agent: Googlebot</span><br><span class="line">Disallow: /baidu</span><br><span class="line">Disallow: /s?</span><br><span class="line">Disallow: /shifen/</span><br><span class="line">Disallow: /homepage/</span><br><span class="line">Disallow: /cpro</span><br><span class="line">Disallow: /ulink?</span><br><span class="line">Disallow: /link?</span><br><span class="line">Disallow: /home/news/data/</span><br><span class="line">Disallow: /bh</span><br><span class="line"></span><br><span class="line"># 中间略去若干内容</span><br><span class="line"></span><br><span class="line">User-agent: *</span><br><span class="line">Disallow: /</span><br></pre></td></tr></table></figure>
+
+<p>解读：“除了我钦点的爬虫之外，其他拒不接待”</p>
+<h5 id="1-4-2-淘宝-x2F-天猫"><a href="#1-4-2-淘宝-x2F-天猫" class="headerlink" title="1.4.2. 淘宝 &#x2F; 天猫"></a>1.4.2. 淘宝 &#x2F; 天猫</h5><figure class="highlight text"><table><tr><td class="code"><pre><span class="line">User-agent: *</span><br><span class="line">Disallow: /</span><br></pre></td></tr></table></figure>
+
+<p>解读：“莫挨老子”</p>
+<h5 id="1-4-3-虎扑"><a href="#1-4-3-虎扑" class="headerlink" title="1.4.3. 虎扑"></a>1.4.3. 虎扑</h5><p>注意这里就出现了我们之前提到过的问题，<a href="https://www.hupu.com/robots.txt">https://www.hupu.com/robots.txt</a> 如下：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">User-agent: *</span><br><span class="line">Allow: /</span><br><span class="line"></span><br><span class="line">Sitemap: https://bbs.hupu.com/sitemap_index.xml</span><br><span class="line">Sitemap: https://bbs.hupu.com/sitemap/sitemap_boards.xml</span><br><span class="line">Sitemap: https://voice.hupu.com/sitemap_index.xml</span><br><span class="line">Sitemap: https://nba.hupu.com/players/index.xml</span><br></pre></td></tr></table></figure>
+
+<p>解读：任何人都可以任意爬，还提供了站点地图供参考</p>
+<p>但是<a href="https://bbs.hupu.com/robots.txt">https://bbs.hupu.com/robots.txt</a> 则是这样的：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">User-agent: *</span><br><span class="line">Request-rate: 50/1</span><br><span class="line">Disallow: /api/</span><br><span class="line">Disallow: /ajax/</span><br><span class="line">Disallow: /profile.php?*</span><br><span class="line">Disallow: /hack/</span><br><span class="line">Disallow: /template/</span><br><span class="line">Disallow: /attachment/</span><br><span class="line">Disallow: /gearfeedback/</span><br><span class="line">Disallow: /*_*.html$</span><br><span class="line"></span><br><span class="line">Sitemap: https://bbs.hupu.com/sitemap_index.xml</span><br><span class="line">Sitemap: https://bbs.hupu.com/sitemap/sitemap_boards.xml</span><br></pre></td></tr></table></figure>
+
+<p>解读：法无禁止皆可为，但是速度不超过50次每秒（注意不同的爬虫其实对于一次爬取的理解是不同的，但是这是君子协议，所以对于我们自己写的爬虫也没有必要那么纠结，如果要仔细考虑的话，可以研究一下不同搜索引擎的爬虫对于这一问题的理解，可以参考<a href="https://www.zhihu.com/robots.txt">知乎的robots.txt</a>以及<a href="https://www.zhihu.com/question/264161961">相关提问</a>）</p>
+<p>虽然虎扑社区比主站多了一些限制，但是我们看到这仍然是限制最少的（虽然限制<code>*_*.html$</code>但是新闻页并不是这样，而且50次每秒其实也不少），加上<del>众所周知的原因</del>虎扑前两天很出圈（至少在我写文档的时候是这样），所以我们将主要爬取虎扑的体育新闻作为演示。</p>
+<h4 id="1-5-如何爬"><a href="#1-5-如何爬" class="headerlink" title="1.5. 如何爬"></a>1.5. 如何爬</h4><p>理想中的高性能爬虫架构：</p>
+<p><img src="/./ideal.png"></p>
+<p>直播用的入门版爬虫架构：</p>
+<p><img src="/./simple.png"></p>
+<h3 id="2-爬虫实战"><a href="#2-爬虫实战" class="headerlink" title="2. 爬虫实战"></a>2. 爬虫实战</h3><h4 id="2-1-准备"><a href="#2-1-准备" class="headerlink" title="2.1. 准备"></a>2.1. 准备</h4><ol>
+<li>Python3:编程语言，推荐使用3.9.2或3.8.8及以上版本</li>
+<li>Pycharm：强大的Python IDE，或者使用其他替代品也可，但不建议用Windows自带的idle</li>
+<li>requests：一个用于发起请求的Python库</li>
+<li>BeautifulSoup4：一个用于解析html的Python库</li>
+<li>fake_useragent：一个用于生成User-Agent的Python库</li>
+</ol>
+<h4 id="2-2-自学内容"><a href="#2-2-自学内容" class="headerlink" title="2.2. 自学内容"></a>2.2. 自学内容</h4><p>上面只说到了比较重要的一些部分，下面还有些可能会用到的自学内容：</p>
+<ul>
+<li>js2py：在Python中执行JavaScript脚本</li>
+<li>pyppeteer：通过headless的方法直接渲染网页</li>
+<li>selenium：控制浏览器进行自动化测试的工具</li>
+<li>requests.Session：保存会话，适用于需要Cookie的场景</li>
+<li>requests添加代理ip</li>
+<li>scrapy：真正的高性能爬虫框架</li>
+</ul>
+<h4 id="2-3-爬取演示"><a href="#2-3-爬取演示" class="headerlink" title="2.3. 爬取演示"></a>2.3. 爬取演示</h4><p>以爬取<a href="https://bbs.hupu.com/502-1">虎扑某板块新闻列表</a>为例：</p>
+<h5 id="2-3-1-引入必要的库"><a href="#2-3-1-引入必要的库" class="headerlink" title="2.3.1. 引入必要的库"></a>2.3.1. 引入必要的库</h5><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">from</span> requests <span class="keyword">import</span> get, post</span><br><span class="line"><span class="keyword">from</span> bs4 <span class="keyword">import</span> BeautifulSoup</span><br><span class="line"><span class="keyword">from</span> fake_useragent <span class="keyword">import</span> UserAgent</span><br><span class="line"><span class="keyword">from</span> urllib.request <span class="keyword">import</span> urljoin</span><br><span class="line"><span class="keyword">from</span> json <span class="keyword">import</span> dump</span><br><span class="line"><span class="keyword">from</span> time <span class="keyword">import</span> sleep  <span class="comment"># 如果网站要求以很低的频率爬，那么大概率会需要sleep</span></span><br></pre></td></tr></table></figure>
+
+<h5 id="2-3-2-Cookie"><a href="#2-3-2-Cookie" class="headerlink" title="2.3.2. Cookie?"></a>2.3.2. Cookie?</h5><p>如果你点开了前面那个链接（而且你最近没有看过虎扑的话），你大概率会发现报了个错，不要怀疑，我没有写错URL，造成这样问题的原因大概是虎扑在切换新旧版面，直接点进去会莫名被转入旧版的页面，而旧版页面的URL大概不是这样写的。</p>
+<p>那么这就要提到之前的一个问题，也就是“你是谁”的问题，虎扑会根据Cookie来判断你是否已经进入了新版页面，而这个Cookie显然是在首页被设置的，因此直接访问这一板块是行不通的。</p>
+<p>从浏览器中获取cookie信息如下（因为内容太长所以我们直接保存在Python变量中）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">Cookie = <span class="string">&#x27;smidV2=20210720104859f6c99288e1bccb891e9ca9ce9d7bb6fe0055f24f4e677eec0; csrfToken=iGeSrk669wqQBcY5fKk2Diue; sensorsdata2015jssdkcross=%7B%22distinct_id%22%3A%2217ac1d102691c24-05465c49cc1a3d8-3e62684b-1296000-17ac1d1026a2685%22%2C%22%24device_id%22%3A%2217ac1d102691c24-05465c49cc1a3d8-3e62684b-1296000-17ac1d1026a2685%22%2C%22props%22%3A%7B%22%24latest_referrer%22%3A%22%22%2C%22%24latest_traffic_source_type%22%3A%22%E7%9B%B4%E6%8E%A5%E6%B5%81%E9%87%8F%22%2C%22%24latest_search_keyword%22%3A%22%E6%9C%AA%E5%8F%96%E5%88%B0%E5%80%BC_%E7%9B%B4%E6%8E%A5%E6%89%93%E5%BC%80%22%7D%7D; acw_tc=2f624a6816268527794733860e071fa5c73b1f702b456ad494e04ecfb5dc53; bbs_2020=1&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<h5 id="2-3-3-获取并解析新闻列表页"><a href="#2-3-3-获取并解析新闻列表页" class="headerlink" title="2.3.3. 获取并解析新闻列表页"></a>2.3.3. 获取并解析新闻列表页</h5><p>我们注意到，虎扑的新闻列表页URL大致可以表示为：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">https://bbs.hupu.com/502-&#123;PAGE&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意到其中每一项的格式大致如下：</p>
+<figure class="highlight html"><table><tr><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">a</span> <span class="attr">href</span>=<span class="string">&quot;/44314069.html&quot;</span> <span class="attr">target</span>=<span class="string">&quot;_blank&quot;</span> <span class="attr">class</span>=<span class="string">&quot;p-title&quot;</span>&gt;</span>[流言板]字母哥：要相信！我曾经上顿不接下顿，如今我是冠军<span class="tag">&lt;/<span class="name">a</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>那么假如我们获取前10页的新闻详情链接：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">url = <span class="string">&#x27;https://bbs.hupu.com/&#x27;</span></span><br><span class="line">news_list = []</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">1</span>, <span class="number">11</span>):</span><br><span class="line">    response = get(<span class="string">f&#x27;https://bbs.hupu.com/502-<span class="subst">&#123;i&#125;</span>&#x27;</span>, headers=&#123;<span class="string">&#x27;Cookie&#x27;</span>: Cookie&#125;)</span><br><span class="line">    soup = BeautifulSoup(response.content.decode(<span class="string">&#x27;utf-8&#x27;</span>), <span class="string">&#x27;lxml&#x27;</span>)</span><br><span class="line">    news = soup.find_all(<span class="string">&#x27;a&#x27;</span>, class_=<span class="string">&#x27;p-title&#x27;</span>)</span><br><span class="line">    <span class="keyword">for</span> n <span class="keyword">in</span> news:</span><br><span class="line">        news_list.append(urljoin(url, n.get(<span class="string">&#x27;href&#x27;</span>)))</span><br><span class="line">    sleep(<span class="number">0.02</span>)   <span class="comment"># 按照要求休息1/50秒</span></span><br></pre></td></tr></table></figure>
+
+<h5 id="2-3-4-获取并解析新闻详情"><a href="#2-3-4-获取并解析新闻详情" class="headerlink" title="2.3.4. 获取并解析新闻详情"></a>2.3.4. 获取并解析新闻详情</h5><p>更好的做法是这里写一个类，但是一个自定义类写入文件又涉及到许多问题，所以我们简单的用字典表示，类似的，我们获取并解析网页：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">news_content = []</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> news_url <span class="keyword">in</span> news_list:</span><br><span class="line">    response = get(news_url, headers=&#123;<span class="string">&#x27;Cookie&#x27;</span>: Cookie&#125;)</span><br><span class="line">    soup = BeautifulSoup(response.content.decode(<span class="string">&#x27;utf-8&#x27;</span>), <span class="string">&#x27;lxml&#x27;</span>)</span><br><span class="line">    title = soup.find(<span class="string">&#x27;h1&#x27;</span>, class_=<span class="string">&#x27;name&#x27;</span>).text.strip()</span><br><span class="line">    content = soup.find(<span class="string">&#x27;div&#x27;</span>, class_=<span class="string">&#x27;thread-content-detail&#x27;</span>).text.strip().replace(<span class="string">&#x27;\r&#x27;</span>, <span class="string">&#x27;\n&#x27;</span>)</span><br><span class="line">    news_content.append(&#123;</span><br><span class="line">        <span class="string">&#x27;url&#x27;</span>: news_url,</span><br><span class="line">        <span class="string">&#x27;title&#x27;</span>: title,</span><br><span class="line">        <span class="string">&#x27;content&#x27;</span>: content</span><br><span class="line">    &#125;)</span><br><span class="line">    sleep(<span class="number">0.02</span>)</span><br></pre></td></tr></table></figure>
+
+<p>接下来我们将获取的内容保存为json</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">dump(news_content, <span class="built_in">open</span>(<span class="string">&#x27;./hupu.json&#x27;</span>, <span class="string">&#x27;w&#x27;</span>), ensure_ascii=<span class="literal">False</span>)</span><br></pre></td></tr></table></figure>
+
+<h4 id="2-4-关于反爬"><a href="#2-4-关于反爬" class="headerlink" title="2.4. 关于反爬"></a>2.4. 关于反爬</h4><p>接下来我们演示一个糟糕的反爬示例，<a href="http://wjw.beijing.gov.cn/">北京卫健委</a>网站</p>
+<p>如果我们直接执行</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">response = get(<span class="string">&#x27;http://wjw.beijing.gov.cn/&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>我们会发现<code>response.text</code>很不对劲，而且其中比较明显能看到的是（当然我经过了格式化）</p>
+<figure class="highlight html"><table><tr><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">div</span> <span class="attr">id</span>=<span class="string">&#x27;notice-jiasule&#x27;</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">p</span>&gt;</span>当前网址：&lt;%- url %&gt;<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">p</span>&gt;</span>客户端特征：&lt;%- user_agent %&gt;<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line">  <span class="tag">&lt;<span class="name">p</span>&gt;</span>拦截时间：&lt;%- now %&gt;<span class="symbol">&amp;nbsp;</span><span class="symbol">&amp;nbsp;</span>本次事件ID<span class="symbol">&amp;nbsp;</span>&lt;%- rule_id %&gt;<span class="tag">&lt;/<span class="name">p</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">div</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>还有下面的</p>
+<figure class="highlight javascript"><table><tr><td class="code"><pre><span class="line"><span class="keyword">var</span> content = _.<span class="title function_">template</span>(<span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&#x27;content_tpl&#x27;</span>).<span class="property">innerHTML</span>)(&#123;</span><br><span class="line">    <span class="attr">error_403</span>: <span class="string">&#x27;&#x27;</span> || <span class="string">&#x27;当前访问疑似黑客攻击，已被网站管理员设置为拦截&#x27;</span>,</span><br><span class="line">    <span class="attr">url</span>: <span class="variable language_">document</span>.<span class="property">URL</span>.<span class="title function_">replace</span>(<span class="regexp">/\&lt;/g</span>,<span class="string">&quot;%3C&quot;</span>).<span class="title function_">replace</span>(<span class="regexp">/\&gt;/g</span>,<span class="string">&quot;%3E&quot;</span>),</span><br><span class="line">    <span class="attr">user_agent</span>: navigator.<span class="property">userAgent</span>,</span><br><span class="line">    <span class="attr">now</span>: <span class="keyword">new</span> <span class="title class_">Date</span>(<span class="keyword">new</span> <span class="title class_">Date</span>() - -<span class="number">8</span> * <span class="number">3600000</span>).<span class="title function_">toISOString</span>().<span class="title function_">substr</span>(<span class="number">0</span>, <span class="number">19</span>).<span class="title function_">replace</span>(<span class="string">&#x27;T&#x27;</span>, <span class="string">&#x27; &#x27;</span>),</span><br><span class="line">    <span class="attr">rule_id</span>: <span class="built_in">parseInt</span>(<span class="string">&#x27;[80001]&#x27;</span>.<span class="title function_">replace</span>(<span class="regexp">/\[|\]/g</span>, <span class="string">&#x27;&#x27;</span>)) || <span class="string">&#x27;&#x27;</span>,</span><br><span class="line">    <span class="attr">from</span>: <span class="built_in">encodeURIComponent</span>(<span class="variable language_">document</span>.<span class="property">referrer</span>.<span class="title function_">substr</span>(<span class="number">0</span>, <span class="number">1024</span>)),</span><br><span class="line">    <span class="attr">client_ip</span>: <span class="string">&#x27;59.66.16.88&#x27;</span>,</span><br><span class="line">    <span class="attr">ref</span>: <span class="built_in">encodeURIComponent</span>(<span class="variable language_">document</span>.<span class="property">URL</span>.<span class="title function_">substr</span>(<span class="number">0</span>, <span class="number">1024</span>))</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>不难发现这个网站所托管的“创宇云防御”屏蔽了我们的访问，而引起这一问题的原因，我们可以查看：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>response.request.headers</span><br><span class="line">&#123;<span class="string">&#x27;User-Agent&#x27;</span>: <span class="string">&#x27;python-requests/2.25.1&#x27;</span>, <span class="string">&#x27;Accept-Encoding&#x27;</span>: <span class="string">&#x27;gzip, deflate&#x27;</span>, <span class="string">&#x27;Accept&#x27;</span>: <span class="string">&#x27;*/*&#x27;</span>, <span class="string">&#x27;Connection&#x27;</span>: <span class="string">&#x27;keep-alive&#x27;</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其中显然有一条<code>&#39;User-Agent&#39;: &#39;python-requests/2.25.1&#39;</code>，不打自招的爬虫行为，被屏蔽也并不奇怪（题外话，这个网站并没有设置robots.txt，因此双方都很难说谁对谁错）。好在现在这个网站不像去年一样会封ip地址，所以我们可以先演示错误示例。</p>
+<p>我们当然可以模仿前面的做法，从浏览器中抄一个User-Agent过来，但是如果我们快速爬很多东西，最好还是每次换一个新的User-Agent减少被当作同一个用户的概率，因此我们使用如下方法：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">ua = UserAgent(path=<span class="string">&#x27;./fake_useragent.json&#x27;</span>)</span><br><span class="line">response = get(<span class="string">&#x27;http://wjw.beijing.gov.cn/&#x27;</span>, headers=&#123;<span class="string">&#x27;User-Agent&#x27;</span>: ua.random&#125;)</span><br><span class="line"><span class="comment"># 没错，ua.random虽然是成员变量，但是每次使用的时候会改变自己，而不是用户调用一个类似于ua.random()的函数才会改变</span></span><br></pre></td></tr></table></figure>
+
+<p>除此之外可能还会需要使用代理ip，如何获取代理地址请自学，使用方法如下：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">proxies = &#123;</span><br><span class="line">    <span class="string">&quot;http&quot;</span>: <span class="string">&quot;http://10.10.1.10:3128&quot;</span>,</span><br><span class="line">    <span class="string">&quot;https&quot;</span>: <span class="string">&quot;http://10.10.1.10:1080&quot;</span>,</span><br><span class="line">&#125;</span><br><span class="line">requests.get(<span class="string">&quot;http://example.org&quot;</span>, proxies=proxies)</span><br></pre></td></tr></table></figure>
+
+<p>使用这两种方法可以避免很多反爬的系统（当然如果检查Cookie大概会很糟糕，可能需要许多Session，像前面那样写死Cookie实际上是非常偷懒的一种做法，但是我不想仔细研究那个Cookie到底在哪里设置以及使用Session应该按什么顺序操作）</p>
+]]></content>
+      <categories>
+        <category>文档</category>
+      </categories>
+      <tags>
+        <tag>Python</tag>
+        <tag>暑培</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Python 速成</title>
+    <url>/2021/07/20/Python-%E9%80%9F%E6%88%90/</url>
+    <content><![CDATA[<h3 id="0-前言"><a href="#0-前言" class="headerlink" title="0. 前言"></a>0. 前言</h3><h4 id="0-0-前前言"><a href="#0-0-前前言" class="headerlink" title="0.0. 前前言"></a>0.0. 前前言</h4><p>这份讲义参考了许多rls的内容，因为让我单独写一份完善的入门讲义还是很困难的，毕竟我自己使用的时候难免有时候会有些ugly的做法，而rls的这份讲义中有大量的东西是我后来才学会的，最近才发现原来早就讲过。</p>
+<p>在此感谢rls去年为科协暑培所做的贡献，去年参加暑培使我收获很大<del>（尤其是小学期）</del>。</p>
+<span id="more"></span>
+
+<h4 id="0-1-面向群体"><a href="#0-1-面向群体" class="headerlink" title="0.1. 面向群体"></a>0.1. 面向群体</h4><p>建议同时满足以下条件的同学听本课程：</p>
+<ul>
+<li>至少有一门语言基础，比如C++</li>
+<li>没有Python基础或接触Python时长小于一星期</li>
+</ul>
+<h4 id="0-2-课程目标"><a href="#0-2-课程目标" class="headerlink" title="0.2. 课程目标"></a>0.2. 课程目标</h4><p>通过本课程，希望你能达成以下目标：</p>
+<ul>
+<li>具备将C++或其他类型语言的逻辑代码（非底层操作）翻译成Python的能力</li>
+<li>能够用Pycharm创建新环境、新项目并进行配置</li>
+<li>认识到Python解释型、强类型、动态类型语言的特点（对比C是编译型、弱类型、静态类型）</li>
+<li>能够自行更深入地学习Python</li>
+</ul>
+<p>本节课<strong>不包含</strong>以下要素：</p>
+<ul>
+<li>爬虫（但是下一节课应该会有）</li>
+<li>可视化</li>
+<li>人(ke)工(xue)智(ji)能(suan)</li>
+<li>以及其他经常被用作Python广告但并非Python基础的内容（亲眼见过有小孩学的Python讲如何做植物大战僵尸，我：？）</li>
+</ul>
+<h4 id="0-3-交互式窗口vs脚本"><a href="#0-3-交互式窗口vs脚本" class="headerlink" title="0.3. 交互式窗口vs脚本"></a>0.3. 交互式窗口vs脚本</h4><p>作为一个解释型语言，Python不需要像C系语言一样编译运行，可以“写一行跑一行”，因此它可以分为交互式窗口运行与脚本运行两种模式。（类似的，在后面讲到JavaScript时也会遇到这个问题）</p>
+<ul>
+<li>交互式窗口：如在命令行输入<code>python</code>，即可进入交互式窗口，此时如同“问答”一般，输入一行代码后Python立刻执行并给出返回值；</li>
+<li>脚本：经典运行方法<code>python xxx.py</code>，Python会将整个脚本依次执行。</li>
+</ul>
+<p>学习阶段建议先从交互式窗口入手，因此在讲Pycharm之前，我们先从命令行开始学习。后续附代码的部分，如果出现了顶格&gt;&gt;&gt;的情况，则暗示这是一个交互式窗口，有&gt;&gt;&gt;的是代码，其他的是执行代码的输出。</p>
+<p>比较特别的一个点是，上文提到的“输出”，除非是<code>print</code>这样的明确输出函数，否则一般情况下它会将执行语句的返回值转化成表示串，这和<code>print</code>的效果或许不同，后面讲字符串部分时会举例子。</p>
+<h4 id="0-4-Hello-World"><a href="#0-4-Hello-World" class="headerlink" title="0.4. Hello World"></a>0.4. Hello World</h4><p>放到哪一节都不太合适，还是放到前言意思意思吧。在命令行输入<code>python</code>，进入Python的交互式界面，然后：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">&#x27;Hello, world!&#x27;</span>)</span><br><span class="line">Hello, world!</span><br></pre></td></tr></table></figure>
+
+<p><img src="/./hello_world.png" alt="hello_world"></p>
+<p>rls的讲义中这个地方还涉及到虚拟环境的问题，这是conda配置的问题，我把它放在补充资料的环境配置中。</p>
+<p>细心的话你会注意到这行代码中没有分号，可以直接运行（无需编译），字符串用了单引号，这些都算是它与C&#x2F;C++不同之处。</p>
+<p><del>好，你已经入门了Python！</del></p>
+<p>退出界面的方法是按<code>ctrl+D</code>或者执行<code>exit()</code>（<code>ipython</code>的问题也会在环境配置文档中说明）。<del>当然你要直接关闭窗口我和rls都没得说。</del>但是在Windows Powershell里 Python 3.9.5版本似乎不可以用<code>ctrl+D</code>退出，我没有找到相关的说明（我的另一个3.8.8的版本是可以的，然而这个版本在cmd里又不行，可见这是一个玄学的字符转义问题）。</p>
+<h4 id="0-5-Python2警告"><a href="#0-5-Python2警告" class="headerlink" title="0.5. Python2警告"></a>0.5. Python2警告</h4><p>如果你此前使用过Python2或看过Python2的教程，那么希望你能对于它和本教程（Python3）的不同之处做好心理准备。Python2从2020年1月1日开始就不再被支持，因此本课程不会如同一些较老的教程一般强调Python2与Python3的差异（况且我和rls都真的不会Python2）。</p>
+<h3 id="1-变量类型-amp-运算"><a href="#1-变量类型-amp-运算" class="headerlink" title="1. 变量类型&amp;运算"></a>1. 变量类型&amp;运算</h3><h4 id="1-1-简易基本类型"><a href="#1-1-简易基本类型" class="headerlink" title="1.1. 简易基本类型"></a>1.1. 简易基本类型</h4><p>最基本类型与C系语言相似：</p>
+<ul>
+<li><code>int</code>：<strong>变长</strong>整数，默认是4字节，有需要时自动增长。（这里需要单独说明的是，Python会存储所有的-5到256的整数，其他任何变量是这些值时，会被指向这个预先开好的内存，因此任何两个值为5的<code>int</code>变量都指向同一内存地址，这一点的影响将在后面看到）。与C系语言不同的是，整除是<code>//</code>，普通除法<code>/</code>会得到<code>float</code>。除了十进制外还支持十六进制、八进制和二进制的表示。</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="number">0x11</span></span><br><span class="line"><span class="number">17</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="number">11</span></span><br><span class="line"><span class="number">11</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="number">0o11</span></span><br><span class="line"><span class="number">9</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="number">0b11</span></span><br><span class="line"><span class="number">3</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>complex</code>：Python中自带了复数类型，表示为<code>real + imag*1j</code>的形式，注意虚部为1的时候不可以省略1，可以用<code>j</code>也可以用<code>J</code>。复数的实虚部分别为一个float。</li>
+<li><code>float</code>：8字节浮点数，相当于C系语言的<code>double</code>。</li>
+<li><code>bool</code>：即众所周知的<code>True</code>和<code>False</code>，注意首字母大写，用作数值计算时与C系一样视作1与0。</li>
+<li><code>NoneType</code>：<code>None</code>，空值，后面会介绍到用处。常用于返回值、特判。</li>
+</ul>
+<h4 id="1-2-运算符"><a href="#1-2-运算符" class="headerlink" title="1.2. 运算符"></a>1.2. 运算符</h4><p>运算符可以重载，此处先不讲重载，但是列出常见运算符与重载函数，后面再讲重载的方法。</p>
+<h5 id="1-2-1-算术运算符"><a href="#1-2-1-算术运算符" class="headerlink" title="1.2.1. 算术运算符"></a>1.2.1. 算术运算符</h5><ul>
+<li><code>+</code>：<code>__add__</code></li>
+<li><code>-</code>：<code>__sub__</code></li>
+<li><code>*</code>：<code>__mul__</code></li>
+<li><code>/</code>：<code>__trudiv__</code>，真除</li>
+<li><code>//</code>：<code>__floordiv__</code>，整除</li>
+<li><code>%</code>：<code>__mod__</code></li>
+<li><code>**</code>：<code>__pow__</code>，幂运算</li>
+</ul>
+<h5 id="1-2-2-比较运算符"><a href="#1-2-2-比较运算符" class="headerlink" title="1.2.2. 比较运算符"></a>1.2.2. 比较运算符</h5><ul>
+<li><code>&lt;</code>：<code>__lt__</code></li>
+<li><code>&lt;=</code>：<code>__le__</code></li>
+<li><code>&gt;</code>：<code>__gt__</code></li>
+<li><code>&gt;=</code>：<code>__ge__</code></li>
+<li><code>==</code>：<code>__eq__</code></li>
+<li><code>!=</code>：<code>__ne__</code></li>
+</ul>
+<h5 id="1-2-3-位运算符"><a href="#1-2-3-位运算符" class="headerlink" title="1.2.3. 位运算符"></a>1.2.3. 位运算符</h5><ul>
+<li><code>&amp;</code>：<code>__and__</code></li>
+<li><code>|</code>：<code>__or__</code></li>
+<li><code>^</code>：<code>__xor__</code></li>
+<li><code>~</code>：<code>__invert__</code>，注意这是一元运算符</li>
+<li><code>&lt;&lt;</code>：<code>__lshift__</code></li>
+<li><code>&gt;&gt;</code>：<code>__rshift__</code></li>
+</ul>
+<h5 id="1-2-4-赋值运算符"><a href="#1-2-4-赋值运算符" class="headerlink" title="1.2.4. 赋值运算符"></a>1.2.4. 赋值运算符</h5><ul>
+<li><code>=</code>：赋值号，注意Python不能重载赋值号</li>
+<li>自x赋值：如自加(<code>__iadd__</code>)、自减(<code>__isub__</code>)等，规则同C++</li>
+</ul>
+<h5 id="1-2-5-一元运算符"><a href="#1-2-5-一元运算符" class="headerlink" title="1.2.5. 一元运算符"></a>1.2.5. 一元运算符</h5><ul>
+<li><code>+</code>：<code>__pos__</code></li>
+<li><code>-</code>：<code>__neg__</code></li>
+</ul>
+<h5 id="1-2-6-逻辑运算符"><a href="#1-2-6-逻辑运算符" class="headerlink" title="1.2.6. 逻辑运算符"></a>1.2.6. 逻辑运算符</h5><p>逻辑运算符也即布尔运算符，无法重载</p>
+<ul>
+<li><code>and</code></li>
+<li><code>or</code></li>
+<li><code>not</code></li>
+</ul>
+<p>注意，对于<code>and</code>和<code>or</code>，得到的结果不会直接转换为<code>bool</code>，而是能够得出结果的最后一个变量，如：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="number">3</span> <span class="keyword">or</span> <span class="number">4</span></span><br><span class="line"><span class="number">3</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="number">3</span> <span class="keyword">and</span> <span class="number">4</span></span><br><span class="line"><span class="number">4</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="number">0</span> <span class="keyword">or</span> <span class="number">1</span> <span class="keyword">and</span> <span class="number">2</span></span><br><span class="line"><span class="number">2</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="number">0</span> <span class="keyword">and</span> <span class="number">1</span> <span class="keyword">or</span> <span class="number">2</span></span><br><span class="line"><span class="number">2</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="number">1</span> <span class="keyword">or</span> <span class="number">0</span> <span class="keyword">and</span> <span class="number">2</span></span><br><span class="line"><span class="number">1</span></span><br></pre></td></tr></table></figure>
+
+<p>注意混用<code>and</code> <code>or</code>时需要考虑<code>and</code>的优先级更高，为了代码的可读性<strong>建议不要混用</strong>，或者显式地加上小括号。</p>
+<h5 id="1-2-7-三目运算符"><a href="#1-2-7-三目运算符" class="headerlink" title="1.2.7. 三目运算符"></a>1.2.7. 三目运算符</h5><p>三目运算符就一个</p>
+<ul>
+<li><code>a if condition else b</code>：相当于C中的<code>condition ? a : b</code></li>
+</ul>
+<p>注意一下它的顺序，当然如果你没学过C&#x2F;C++的话这个读起来还是很通顺的，可惜你学过了C&#x2F;C++，那么请务必不要搞反了参数顺序。</p>
+<h5 id="1-2-8-其他运算符"><a href="#1-2-8-其他运算符" class="headerlink" title="1.2.8. 其他运算符"></a>1.2.8. 其他运算符</h5><p>下面运算符是C系没有的：</p>
+<ul>
+<li><code>in</code>：<code>__contain__</code>，被包含于（见容器）</li>
+<li><code>not in</code>：<code>in</code>的否定</li>
+<li><code>is</code>：判断两个变量的地址是否相同，不可重载（不建议对临时变量使用，可能得到匪夷所思的结果）</li>
+<li><code>is not</code>：判断两个变量地址是否不同</li>
+</ul>
+<p>这里注意前面提到过-5到256的整数的问题，所以会得到以下结果</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>a = <span class="number">256</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>b = <span class="number">256</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a <span class="keyword">is</span> b</span><br><span class="line"><span class="literal">True</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>c = <span class="number">257</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>d = <span class="number">257</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>c <span class="keyword">is</span> d</span><br><span class="line"><span class="literal">False</span></span><br></pre></td></tr></table></figure>
+
+<p>这是由于分别构造的两个值相同的变量一般占据不同的内存空间，但-5到256的整数由于前面提过的原因，不会出现两次内存分配。</p>
+<h4 id="1-3-字符串与字节串"><a href="#1-3-字符串与字节串" class="headerlink" title="1.3. 字符串与字节串"></a>1.3. 字符串与字节串</h4><p>Python的一个便利点在于将字符串与字节串封装成了基本类型并处理了多种运算、引入了多种方法。</p>
+<p>注意基本类型本身是不可修改的（注意区分赋值与修改），这与后面的容器不同（也与C系的<code>char *</code>不同）。</p>
+<h5 id="1-3-1-字符串"><a href="#1-3-1-字符串" class="headerlink" title="1.3.1. 字符串"></a>1.3.1. 字符串</h5><p><code>str</code>即是Python中的字符串，与C系的<code>char *</code>的区别在于<code>str</code>类型的变量不可以修改（也即不可以修改某个位置的字符，只能重新构造整个字符串），且更重要的是它每个位置存的是一个unicode而非ascii。</p>
+<p>此外，Python中没有单独的字符类型，单个字符将被视为长度为1的字符串。</p>
+<p>构造字符串的方法是使用单引号或双引号，注意Python里单双引号构造字符串是没有任何差别的，可以根据个人习惯或实际场景使用，转义符的使用与C基本一致（尽管此处还没有讲到输出函数<code>print</code>，试着先接受这一点：<code>print(a)</code>是一个函数，它能打印变量<code>a</code>）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">&#x27;你好世界&#x27;</span>)</span><br><span class="line">你好世界</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">&quot;你好世界&quot;</span>)</span><br><span class="line">你好世界</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">&#x27;&quot;你好世界&quot;&#x27;</span>)</span><br><span class="line"><span class="string">&quot;你好世界&quot;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">&quot;&#x27;你好世界&#x27;&quot;</span>)</span><br><span class="line"><span class="string">&#x27;你好世界&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">&#x27;\&#x27;你好世界\&#x27;&#x27;</span>)</span><br><span class="line"><span class="string">&#x27;你好世界&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">&quot;\&quot;你好世界\&quot;&quot;</span>)</span><br><span class="line"><span class="string">&quot;你好世界&quot;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&#x27;你好世界&#x27;</span></span><br><span class="line"><span class="string">&#x27;你好世界&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&quot;你好世界&quot;</span></span><br><span class="line"><span class="string">&#x27;你好世界&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&#x27;&quot;你好世界&quot;&#x27;</span></span><br><span class="line"><span class="string">&#x27;&quot;你好世界&quot;&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&quot;&#x27;你好世界&#x27;&quot;</span></span><br><span class="line"><span class="string">&quot;&#x27;你好世界&#x27;&quot;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&#x27;\&#x27;你好世界\&#x27;&#x27;</span></span><br><span class="line"><span class="string">&quot;&#x27;你好世界&#x27;&quot;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&quot;\&quot;你好世界\&quot;&quot;</span></span><br><span class="line"><span class="string">&#x27;&quot;你好世界&quot;&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>除此之外还有原始字符串（raw string）、跨行字符串等，可以自行了解。</p>
+<p>此处说明几个重要函数：</p>
+<ul>
+<li><code>len(obj)</code>：<code>__len__</code>，获取obj的参数，常用于获取字符串（注意是unicode，因此中文和英文字符一样长）、字节串或容器的长度</li>
+<li><code>chr(i)</code>：将整型变量<code>i</code>转化成（长度为1的）的字符（串）</li>
+<li><code>ord(c)</code>：获取（长度为1的）字符（串）的编号（Unicode）</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">len</span>(<span class="string">&#x27;你好世界&#x27;</span>)</span><br><span class="line"><span class="number">4</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">ord</span>(<span class="string">&#x27;你&#x27;</span>)</span><br><span class="line"><span class="number">20320</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">hex</span>(<span class="built_in">ord</span>(<span class="string">&#x27;你&#x27;</span>))</span><br><span class="line"><span class="string">&#x27;0x4f60&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">chr</span>(<span class="number">0x4f60</span>)</span><br><span class="line"><span class="string">&#x27;你&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&#x27;\u4f60&#x27;</span></span><br><span class="line"><span class="string">&#x27;你&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">ord</span>(<span class="string">&#x27;a&#x27;</span>)</span><br><span class="line"><span class="number">97</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">ord</span>(<span class="string">&#x27;你好&#x27;</span>)</span><br><span class="line">---------------------------------------------------------------------------</span><br><span class="line">TypeError                                 Traceback (most recent call last)</span><br><span class="line">&lt;ipython-<span class="built_in">input</span>-<span class="number">28</span>-b179c21de46c&gt; <span class="keyword">in</span> &lt;module&gt;</span><br><span class="line">----&gt; <span class="number">1</span> <span class="built_in">ord</span>(<span class="string">&#x27;你好&#x27;</span>)</span><br><span class="line"></span><br><span class="line">TypeError: <span class="built_in">ord</span>() expected a character, but string of length <span class="number">2</span> found</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">chr</span>(<span class="number">1234567</span>)</span><br><span class="line">---------------------------------------------------------------------------</span><br><span class="line">ValueError                                Traceback (most recent call last)</span><br><span class="line">&lt;ipython-<span class="built_in">input</span>-<span class="number">29</span>-8215e040e74b&gt; <span class="keyword">in</span> &lt;module&gt;</span><br><span class="line">----&gt; <span class="number">1</span> <span class="built_in">chr</span>(<span class="number">1234567</span>)</span><br><span class="line"></span><br><span class="line">ValueError: <span class="built_in">chr</span>() arg <span class="keyword">not</span> <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">0x110000</span>)</span><br></pre></td></tr></table></figure>
+
+<p>注意到a的Unicode就是它的ASCII码，这是符合期望的。另外如果函数输入有问题，则会有几行异常提示，最下方会说明异常原因<del>（相信你高考英语阅读理解分数不错）</del></p>
+<p>此外字符串也会支持一些运算符，通常来说这些运算符的含义是很符合人的直觉的<del>（否则你可以去暴揍一顿重载这些运算符的人然后提pr改掉它们）</del>，这里课上举几个例子即可，不单独列出。</p>
+<p>此外字符串本身包含非常多的函数，下面编码一节会提到<code>str.encode</code>，其他函数后面会提及学习方法。在此重申字符串是不可修改的基本类型，因此字符串函数一定不会是原地修改，有需要的话会生成一个新的字符串（如<code>str.replace</code>）。</p>
+<p>格式化字符串有多种模式，这里简单介绍一种最快也最符合直觉的方式（尽管我是后来才学会的所以并不习惯于这样做），即f-string：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>name = <span class="string">&#x27;SAST&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>date = <span class="string">&#x27;2021-07-19&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">f&#x27;today is <span class="subst">&#123;date&#125;</span> and <span class="subst">&#123;name&#125;</span> is teaching python.&#x27;</span>)</span><br><span class="line">today <span class="keyword">is</span> <span class="number">2021</span>-07-<span class="number">19</span> <span class="keyword">and</span> SAST <span class="keyword">is</span> teaching python.</span><br></pre></td></tr></table></figure>
+
+<p>f-string是由f开头的字符串，其中被<code>&#123;&#125;</code>包裹的表达式会被计算，也即在使用的时候才会生成</p>
+<p>此外还有两种方式，列举如下，不再展开</p>
+<p>C风格的格式化字符串（注意后面需要一个元组，元组的内容在后面讲到）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>name = <span class="string">&#x27;SAST&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>date = <span class="string">&#x27;2021-07-19&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">&#x27;today is %s and %s is teaching python.&#x27;</span> % (date, name))</span><br><span class="line">today <span class="keyword">is</span> <span class="number">2021</span>-07-<span class="number">19</span> <span class="keyword">and</span> SAST <span class="keyword">is</span> teaching python.</span><br></pre></td></tr></table></figure>
+
+<p>format方法格式化字符串：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>name = <span class="string">&#x27;SAST&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>date = <span class="string">&#x27;2021-07-19&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">&#x27;today is &#123;&#125; and &#123;&#125; is teaching python.&#x27;</span>.<span class="built_in">format</span>(date, name))</span><br><span class="line">today <span class="keyword">is</span> <span class="number">2021</span>-07-<span class="number">19</span> <span class="keyword">and</span> SAST <span class="keyword">is</span> teaching python.</span><br></pre></td></tr></table></figure>
+
+<p>以上几种方式都支持C风格的格式化，具体方法可以自行学习</p>
+<h5 id="1-3-2-字节串"><a href="#1-3-2-字节串" class="headerlink" title="1.3.2. 字节串"></a>1.3.2. 字节串</h5><p><code>bytes</code>即是Python中的字节串，它表示最纯粹的“二进制”数据，非常像C里的<code>unsigned char *</code>，但是在显示上它仅支持ASCII显示，因此用肉眼看显得有些不伦不类，通常它只存在于数据的处理过程中。</p>
+<p><code>bytes</code>的构造与字符串类似，但是要加一个b做前导：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">b&#x27;123&#x27;</span>)</span><br><span class="line"><span class="string">b&#x27;123&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">b&#x27;\1&#x27;</span>)</span><br><span class="line"><span class="string">b&#x27;\x01&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">b&#x27;\x41&#x27;</span>)</span><br><span class="line"><span class="string">b&#x27;A&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="string">b&#x27;\x61\x62&#x27;</span>)</span><br><span class="line"><span class="string">b&#x27;ab&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">print</span>(<span class="built_in">len</span>(<span class="string">b&#x27;\x61\x62&#x27;</span>))</span><br><span class="line"><span class="number">2</span></span><br></pre></td></tr></table></figure>
+
+<p><code>bytes</code>本身的运算符显得并不重要，因为我们很少自己编辑<code>bytes</code>，真正重要的是它与<code>str</code>之间的转换以及随之而来的编码问题。</p>
+<h5 id="1-3-3-编码与转换"><a href="#1-3-3-编码与转换" class="headerlink" title="1.3.3. 编码与转换"></a>1.3.3. 编码与转换</h5><p>Unicode是通用的编码，它在世界范围内提供了统一的字符集编码。但是传输过程中裸传 Unicode 可能引起一些问题 （如鲁棒性问题、空间浪费等），因此有了对 Unicode 进行实现的编码，如 UTF-8、UTF-16、GBK 等等，它们统称为 Uncode 转换格式 (Unicode Transform Format）。对于我们日常见到的文件，一个汉字两个字节的常是 GBK 编码，一个汉宇三个字节的常是 UTF-8编码，部分同学曾经或将来在写C++时或许会处理这样的问题。</p>
+<p>字符串本身是代表的 Unicode，但是在文件存储时常常存储为UTF-8或GBK编码，字节串本没有编码信息，需要人为指定或用一些算法去推导。另外GBK 是 GB2312 的扩展，有时候打开一些文件编辑器会提示编码方式是 GB2312，方便起见大家写代码时直接用 GBK 即可，下文同。</p>
+<p><code>str</code>自身有函数<code>str.encode</code>可以编码成<code>bytes</code>，而<code>bytes</code>也有函数<code>bytes.decode</code>可以解码成 <code>str</code>。（我所用的版本）Linux、Mac、Windows下默认是UTF-8，但如果我没记错的话有些Windows会用ANSI之类的编码，因此最好显式地写出编码格式。下面是几个例子（注：<code>＃</code>引导的是单行注释，和C中的<code>//</code>效果基本一样，但是<code>#</code>左边必须有空格符号隔开）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&#x27;Hello world&#x27;</span>.encode()</span><br><span class="line"><span class="string">b&#x27;Hello world&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">b&#x27;Hello world&#x27;</span>.decode()</span><br><span class="line"><span class="string">&#x27;Hello world&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&#x27;你好&#x27;</span>.encode()        <span class="comment"># 在我的Mac上不加编码方式默认UTF-8，你可以试试其他操作系统默认编码方式是什么</span></span><br><span class="line"><span class="string">b&#x27;\xe4\xbd\xa0\xe5\xa5\xbd&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&#x27;你好&#x27;</span>.encode(<span class="string">&#x27;utf-8&#x27;</span>) <span class="comment"># 相当于&#x27;你好&#x27;.encode(encoding=&#x27;utf-8&#x27;)</span></span><br><span class="line"><span class="string">b&#x27;\xe4\xbd\xa0\xe5\xa5\xbd&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">&#x27;你好&#x27;</span>.encode(<span class="string">&#x27;gbk&#x27;</span>)</span><br><span class="line"><span class="string">b&#x27;\xc4\xe3\xba\xc3&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">b&#x27;\xe4\xbd\xa0\xe5\xa5\xbd&#x27;</span>.decode(<span class="string">&#x27;gbk&#x27;</span>)</span><br><span class="line"><span class="string">&#x27;浣犲ソ&#x27;</span>                    <span class="comment"># 这种情况俗称“中文乱码”</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">b&#x27;\xe4\xbd\xa0\xe5\xa5\xbd&#x27;</span>.decode(<span class="string">&#x27;utf-8&#x27;</span>)</span><br><span class="line"><span class="string">&#x27;你好&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="string">b&#x27;\xc4\xe3\xba\xc3&#x27;</span>.decode(<span class="string">&#x27;utf-8&#x27;</span>)  <span class="comment"># 用gbk解utf-8或许是乱码，反过来则可能直接报错</span></span><br><span class="line">---------------------------------------------------------------------------</span><br><span class="line">UnicodeDecodeError                        Traceback (most recent call last)</span><br><span class="line">&lt;ipython-<span class="built_in">input</span>-<span class="number">52</span>-81396d56f1d0&gt; <span class="keyword">in</span> &lt;module&gt;</span><br><span class="line">----&gt; <span class="number">1</span> <span class="string">b&#x27;\xc4\xe3\xba\xc3&#x27;</span>.decode(<span class="string">&#x27;utf-8&#x27;</span>)</span><br><span class="line"></span><br><span class="line">UnicodeDecodeError: <span class="string">&#x27;utf-8&#x27;</span> codec can<span class="string">&#x27;t decode byte 0xc4 in position 0: invalid continuation byte</span></span><br><span class="line"><span class="string">&gt;&gt;&gt; b&#x27;</span>\xe4\xbd\xa0\xe5\xa5\xbd<span class="string">&#x27;.decode() # 不加编码方式默认为utf-8</span></span><br><span class="line"><span class="string">&#x27;</span>你好<span class="string">&#x27;</span></span><br><span class="line"><span class="string">&gt;&gt;&gt; b&#x27;</span>\xcc\xcc\xcc\xcc\xcc\xcc\xcc\xcc\xcc\xcc<span class="string">&#x27;.decode(&#x27;</span>gbk<span class="string">&#x27;) # ？</span></span><br><span class="line"><span class="string">&#x27;</span>烫烫烫烫烫<span class="string">&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="1-4-容器"><a href="#1-4-容器" class="headerlink" title="1.4. 容器"></a>1.4. 容器</h4><p>Python提供了一系列内置容器，它们如同C++的STL一样，不过比STL的用法灵活得多。</p>
+<h5 id="1-4-0-预备知识"><a href="#1-4-0-预备知识" class="headerlink" title="1.4.0. 预备知识"></a>1.4.0. 预备知识</h5><p>为了便于学习这部分内容，先补充几个函数：</p>
+<ul>
+<li><code>type(obj)</code>：可以获取参数obj的类型</li>
+<li><code>isinstance(obj, class_or_tuple)</code>：可以判断obj是不是一个&#x2F;些类或子类的实例</li>
+<li><code>id(obj)</code>：获取obj的地址，<code>a is b</code>等价于<code>id(a) == id(b)</code></li>
+</ul>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">type</span>((<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>))</span><br><span class="line">&lt;<span class="keyword">class</span> <span class="string">&#x27;tuple&#x27;</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">type</span>(<span class="built_in">int</span>)</span><br><span class="line">&lt;<span class="keyword">class</span> <span class="string">&#x27;type&#x27;</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">isinstance</span>(<span class="number">1</span>, <span class="built_in">float</span>)</span><br><span class="line"><span class="literal">False</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">isinstance</span>(<span class="number">1</span>, (<span class="built_in">int</span>, <span class="built_in">list</span>))</span><br><span class="line"><span class="literal">True</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">isinstance</span>((<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>), (<span class="built_in">int</span>, <span class="built_in">float</span>, <span class="built_in">list</span>))</span><br><span class="line"><span class="literal">False</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">isinstance</span>((<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>), (<span class="built_in">float</span>, <span class="built_in">tuple</span>))</span><br><span class="line"><span class="literal">True</span></span><br></pre></td></tr></table></figure>
+
+<h5 id="1-4-1-list"><a href="#1-4-1-list" class="headerlink" title="1.4.1. list"></a>1.4.1. list</h5><p>列表（list）是很常用的容器，常被看作Python中的数组，但一定要类比的话或许类比成向量比较好。</p>
+<p>列表的构造是用中括号完成，按索引访问、修改数据与C中数组基本一样，如：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>[<span class="number">1</span>, [<span class="number">2</span>], <span class="string">&#x27;3&#x27;</span>]</span><br><span class="line">[<span class="number">1</span>, [<span class="number">2</span>], <span class="string">&#x27;3&#x27;</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a[<span class="number">2</span>]</span><br><span class="line"><span class="number">3</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a[<span class="number">1</span>] = <span class="number">10</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a</span><br><span class="line">[<span class="number">1</span>, <span class="number">10</span>, <span class="number">3</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">id</span>(a)</span><br><span class="line"><span class="number">139715443892352</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a.append(<span class="number">9</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">id</span>(a)</span><br><span class="line"><span class="number">139715443892352</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a</span><br><span class="line">[<span class="number">1</span>, <span class="number">10</span>, <span class="number">3</span>, <span class="number">9</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a = [<span class="number">1</span>, <span class="number">10</span>, <span class="number">3</span>, <span class="number">9</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">id</span>(a)</span><br><span class="line"><span class="number">139715443838848</span></span><br></pre></td></tr></table></figure>
+
+<p>与C不同的是，Python中的容器支持反向索引和切片的操作，如：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>a = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a[-<span class="number">1</span>]</span><br><span class="line"><span class="number">4</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a[-<span class="number">2</span>]</span><br><span class="line"><span class="number">3</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a[<span class="number">1</span>: <span class="number">3</span>]    <span class="comment"># 注意区间</span></span><br><span class="line">[<span class="number">2</span>, <span class="number">3</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a[<span class="number">1</span>: <span class="number">3</span>: -<span class="number">1</span>]</span><br><span class="line">[<span class="number">3</span>, <span class="number">2</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a[::<span class="number">2</span>]</span><br><span class="line">[<span class="number">1</span>, <span class="number">3</span>]</span><br></pre></td></tr></table></figure>
+
+<p>列表有一系列的函数，如与栈、队列类似的接口，这部分内容自学，后面会提到如何学习。</p>
+<p>这里强调一下注意 赋值 与 修改 的差别，id是有变化的，认识到这一点对于学习Python的引用特性颇有意义。</p>
+<p>此外同字符串一样，列表也会支持一些运算符操作，同样自学。如果你需要构造空列表，直接写<code>[]</code>即可，或者<code>list()</code>有等价效果。</p>
+<h5 id="1-4-2-tuple"><a href="#1-4-2-tuple" class="headerlink" title="1.4.2. tuple"></a>1.4.2. tuple</h5><p>元组（tuple）是一种常被新手忽略，但是高效有用的容器。它像是“列表常量”，用小括号生成，不可修改（弱意义上的）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>(<span class="number">1</span>, (<span class="number">2</span>, <span class="number">3</span>, ), <span class="number">4</span>)</span><br><span class="line">(<span class="number">1</span>, (<span class="number">2</span>, <span class="number">3</span>), <span class="number">4</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a = (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a[<span class="number">1</span>]</span><br><span class="line"><span class="number">2</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a[<span class="number">0</span>] = <span class="number">1</span></span><br><span class="line">---------------------------------------------------------------------------</span><br><span class="line">TypeError                                 Traceback (most recent call last)</span><br><span class="line">&lt;ipython-<span class="built_in">input</span>-<span class="number">56</span>-c8548dbc0a7e&gt; <span class="keyword">in</span> &lt;module&gt;</span><br><span class="line">----&gt; <span class="number">1</span> a[<span class="number">0</span>] = <span class="number">1</span></span><br><span class="line"></span><br><span class="line">TypeError: <span class="string">&#x27;tuple&#x27;</span> <span class="built_in">object</span> does <span class="keyword">not</span> support item assignment</span><br></pre></td></tr></table></figure>
+
+<p>元组的小括号有时候是可以省略的（省略规则自学<del>，我也不知道怎么总结</del>，总之就是不引起歧义），因此在Python中没有逗号运算符的说法，逗号会构造元组，也正因此可以写出一个经典的Python交换赋值代码：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>a = <span class="number">1</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>b = <span class="number">2</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a, b</span><br><span class="line">(<span class="number">1</span>, <span class="number">2</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a, b = b, a    <span class="comment"># 这里发生了元组的拆包</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a</span><br><span class="line"><span class="number">2</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>b</span><br><span class="line"><span class="number">1</span></span><br></pre></td></tr></table></figure>
+
+<p>另外元组本身不可修改，但是如果元组的元素是可以修改的，那么可以修改这些元素：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>a = <span class="number">1</span>, [<span class="number">2</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a[<span class="number">1</span>].append(<span class="number">3</span>) <span class="comment"># a[1]是list的引用，因此修改list的时候并没有修改tuple中存储的内容</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a</span><br><span class="line">(<span class="number">1</span>, [<span class="number">2</span>, <span class="number">3</span>])</span><br></pre></td></tr></table></figure>
+
+<p>注意，如果你希望构造一个单元素元组或者空元组，操作有点特殊：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>(<span class="number">1</span>)            <span class="comment"># 这是括号里有个1，算完还是1</span></span><br><span class="line"><span class="number">1</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>(<span class="number">1</span>,)           <span class="comment"># 这是有单元素1的元组</span></span><br><span class="line">(<span class="number">1</span>,)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>()             <span class="comment"># 这是空元组</span></span><br><span class="line">()</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">tuple</span>()        <span class="comment"># 这也是空元组</span></span><br><span class="line">()</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>(,)            <span class="comment"># 这是bug</span></span><br><span class="line">  File <span class="string">&quot;&lt;ipython-input-62-d79fbbe8be60&gt;&quot;</span>, line <span class="number">1</span></span><br><span class="line">    (,)</span><br><span class="line">     ^</span><br><span class="line">SyntaxError: invalid syntax</span><br></pre></td></tr></table></figure>
+
+<h5 id="1-4-3-set"><a href="#1-4-3-set" class="headerlink" title="1.4.3. set"></a>1.4.3. set</h5><p>集合（set）对于一般程序员来说用得就更少了，但是对于我们而言应当认识到它的高效之处，至少从数学意义上讲集合由一组无序、互不重复的元素构成，这已经暗含了很多信息。集合一般用<code>&#123;&#125;</code>构造，或者直接对列表等类型进行转换，（至少在现在的Python版本里）集合内部用hash实现，不保序，核心函数是<code>set.add</code>与<code>set.remove</code>，操作实例如下：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>&#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;</span><br><span class="line">&#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a = &#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a.add(<span class="number">4</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a.remove(<span class="number">2</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>a</span><br><span class="line">&#123;<span class="number">1</span>, <span class="number">3</span>, <span class="number">4</span>&#125;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="number">3</span> <span class="keyword">in</span> a</span><br><span class="line"><span class="literal">True</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">set</span>([<span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">2</span>, <span class="number">3</span>])</span><br><span class="line">&#123;<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意空集合的构造比较特殊，你只能使用<code>set()</code>，因为很不幸<code>&#123;&#125;</code>的表达被空字典占用了。</p>
+<h5 id="1-4-4-dict"><a href="#1-4-4-dict" class="headerlink" title="1.4.4. dict"></a>1.4.4. dict</h5><p>字典（dict）相信对于oier并不陌生<del>（说的好像我是oier&#x2F;oier用我教）</del>，它是一个键值对（Key-Value）容器，用于存储一组有穷映射，常用<code>&#123;key: value&#125;</code>的形式表示，调用与C++ STL中的map类似，底层实现基于hash但是略复杂，可以自行学习。它的基本操作如下：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>d = &#123;<span class="string">&#x27;name&#x27;</span>: <span class="string">&#x27;张三&#x27;</span>, <span class="string">&#x27;age&#x27;</span>: <span class="number">18</span>&#125;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>d[<span class="string">&#x27;name&#x27;</span>] = <span class="string">&#x27;李四&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>d</span><br><span class="line">&#123;<span class="string">&#x27;name&#x27;</span>: <span class="string">&#x27;李四&#x27;</span>, <span class="string">&#x27;age&#x27;</span>: <span class="number">18</span>&#125;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>d[<span class="string">&#x27;age&#x27;</span>] += <span class="number">1</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>d</span><br><span class="line">&#123;<span class="string">&#x27;name&#x27;</span>: <span class="string">&#x27;李四&#x27;</span>, <span class="string">&#x27;age&#x27;</span>: <span class="number">19</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意字典的键（包括集合的元素）必须是可以hash的，这通过对应类（型）的<code>__hash__</code>函数实现。而对于Python内置<strong>可变容器</strong>是没有实现该函数的，因此无法作为字典的键或者集合元素：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>d[[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]] = <span class="number">1</span></span><br><span class="line">---------------------------------------------------------------------------</span><br><span class="line">TypeError                                 Traceback (most recent call last)</span><br><span class="line">&lt;ipython-<span class="built_in">input</span>-<span class="number">64</span>-43aceb8d1e57&gt; <span class="keyword">in</span> &lt;module&gt;</span><br><span class="line">----&gt; <span class="number">1</span> d[[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]] = <span class="number">1</span></span><br><span class="line"></span><br><span class="line">TypeError: unhashable <span class="built_in">type</span>: <span class="string">&#x27;list&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>&#123;<span class="number">0</span>, (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>), &#123;<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>&#125;&#125;</span><br><span class="line">---------------------------------------------------------------------------</span><br><span class="line">TypeError                                 Traceback (most recent call last)</span><br><span class="line">&lt;ipython-<span class="built_in">input</span>-<span class="number">66</span>-a8806a59920b&gt; <span class="keyword">in</span> &lt;module&gt;</span><br><span class="line">----&gt; <span class="number">1</span> &#123;<span class="number">0</span>, (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>), &#123;<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>&#125;&#125;</span><br><span class="line"></span><br><span class="line">TypeError: unhashable <span class="built_in">type</span>: <span class="string">&#x27;set&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>d[(<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>)] = &#123;(<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>), (<span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>)&#125;    <span class="comment"># tuple是可hash的类型，因此可以作为键</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>d</span><br><span class="line">&#123;<span class="string">&#x27;name&#x27;</span>: <span class="string">&#x27;李四&#x27;</span>, <span class="string">&#x27;age&#x27;</span>: <span class="number">19</span>, (<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>): &#123;(<span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>), (<span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>)&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h5 id="1-4-5-补充"><a href="#1-4-5-补充" class="headerlink" title="1.4.5. 补充"></a>1.4.5. 补充</h5><p>前面提到了元组解包的操作，但解包的作用远不止多个变量赋值，请自行学习<del>（实际上我好像是在JS里面第一次了解这些）</del>。</p>
+<h4 id="1-5-迭代器"><a href="#1-5-迭代器" class="headerlink" title="1.5. 迭代器"></a>1.5. 迭代器</h4><h5 id="1-5-1-可迭代对象"><a href="#1-5-1-可迭代对象" class="headerlink" title="1.5.1. 可迭代对象"></a>1.5.1. 可迭代对象</h5><p>迭代器属于高级特性之一，前文提到的容器外加字符串、字节串都是可迭代的，它常常与生成器进行比较。通常来说我们自己写生成器、迭代器（造轮子）的情况比较少，这里重点讲它的应用，关于它们的构造可以自行根据文末资料学习。</p>
+<p>实际上我们用到比较多的是可迭代对象，这意味着它们可以用作<code>for</code>循环、直接构造出<code>list</code>、<code>tuple</code>等，这将在生成器一节提到。</p>
+<h5 id="1-5-2-range"><a href="#1-5-2-range" class="headerlink" title="1.5.2. range"></a>1.5.2. range</h5><p><code>range</code>是一个特殊的类型，先让我们用一点简单的例子来见证<code>range</code>的作用：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">list</span>(<span class="built_in">range</span>(<span class="number">10</span>))</span><br><span class="line">[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>[i <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">10</span>)]</span><br><span class="line">[<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>]</span><br></pre></td></tr></table></figure>
+
+<p>实际上这可能有一点点超纲，至少你可以看到<code>range</code>实例是可以转换成list的，此外<code>range</code>的参数与C的<code>for</code>循环颇有相似之处。这里介绍一个查看帮助的函数<code>help(obj)</code>。执行</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="built_in">help</span>(<span class="built_in">range</span>)</span><br></pre></td></tr></table></figure>
+
+<p>你会看到</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Help on class range in module builtins:</span><br><span class="line"></span><br><span class="line">class range(object)</span><br><span class="line"> |  range(stop) -&gt; range object</span><br><span class="line"> |  range(start, stop[, step]) -&gt; range object</span><br><span class="line"> |</span><br><span class="line"> |  Return an object that produces a sequence of integers from start (inclusive)</span><br><span class="line"> |  to stop (exclusive) by step.  range(i, j) produces i, i+1, i+2, ..., j-1.</span><br><span class="line"> |  start defaults to 0, and stop is omitted!  range(4) produces 0, 1, 2, 3.</span><br><span class="line"> |  These are exactly the valid indices for a list of 4 elements.</span><br><span class="line"> |  When step is given, it specifies the increment (or decrement).</span><br><span class="line"> |</span><br><span class="line"> |  Methods defined here:</span><br><span class="line"> |</span><br><span class="line"> |  __bool__(self, /)</span><br><span class="line"> |      self != 0</span><br><span class="line"> |</span><br><span class="line"> |  __contains__(self, key, /)</span><br><span class="line"> |      Return key in self.</span><br><span class="line"># 下略</span><br></pre></td></tr></table></figure>
+
+<p>如果你执行下述内容：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">range</span>(<span class="number">10</span>)</span><br><span class="line"><span class="built_in">range</span>(<span class="number">0</span>, <span class="number">10</span>)</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">type</span>(<span class="built_in">range</span>(<span class="number">10</span>))</span><br><span class="line">&lt;<span class="keyword">class</span> <span class="string">&#x27;range&#x27;</span>&gt;</span><br></pre></td></tr></table></figure>
+
+<p>你会发现<code>range</code>本身即是一个类型，它不是迭代器的子类，但它却是可以迭代、且<strong>节省空间</strong>（比如说对于巨大的<code>for</code>循环，真的生成一个很长的列表显然是错误的，此时<code>range</code>起到与C系<code>for</code>循环变量类似的作用）的存在。</p>
+<h4 id="1-6-生成式"><a href="#1-6-生成式" class="headerlink" title="1.6. 生成式"></a>1.6. 生成式</h4><p>使用生成式构造容器是非常常见、高效的操作，下面举几个例子：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>a = <span class="built_in">list</span>(<span class="built_in">range</span>(<span class="number">10</span>))                <span class="comment"># 直接构造列表为基本列表</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>[i ** <span class="number">2</span> <span class="keyword">for</span> i <span class="keyword">in</span> a]                <span class="comment"># 列表生成式构造平方数列表</span></span><br><span class="line">[<span class="number">0</span>, <span class="number">1</span>, <span class="number">4</span>, <span class="number">9</span>, <span class="number">16</span>, <span class="number">25</span>, <span class="number">36</span>, <span class="number">49</span>, <span class="number">64</span>, <span class="number">81</span>]</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>&#123;x % <span class="number">7</span> <span class="keyword">for</span> x <span class="keyword">in</span> a <span class="keyword">if</span> x % <span class="number">3</span> != <span class="number">1</span>&#125;   <span class="comment"># 集合生成式筛选出模3不余1的数模7后的集合</span></span><br><span class="line">&#123;<span class="number">0</span>, <span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">5</span>, <span class="number">6</span>&#125;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>&#123;x ** <span class="number">2</span>: x <span class="keyword">for</span> x <span class="keyword">in</span> a&#125;             <span class="comment"># 字典生成式构造平方数到原数的字典</span></span><br><span class="line">&#123;<span class="number">0</span>: <span class="number">0</span>, <span class="number">1</span>: <span class="number">1</span>, <span class="number">4</span>: <span class="number">2</span>, <span class="number">9</span>: <span class="number">3</span>, <span class="number">16</span>: <span class="number">4</span>, <span class="number">25</span>: <span class="number">5</span>, <span class="number">36</span>: <span class="number">6</span>, <span class="number">49</span>: <span class="number">7</span>, <span class="number">64</span>: <span class="number">8</span>, <span class="number">81</span>: <span class="number">9</span>&#125;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>(x + <span class="number">1</span> <span class="keyword">for</span> x <span class="keyword">in</span> a)                 <span class="comment"># 试图构造一个1到10的元组……哪里不太对？</span></span><br><span class="line">&lt;generator <span class="built_in">object</span> &lt;genexpr&gt; at <span class="number">0x104fc72e0</span>&gt;</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">tuple</span>(x + <span class="number">1</span> <span class="keyword">for</span> x <span class="keyword">in</span> a)            <span class="comment"># 这次构造元组成功了</span></span><br><span class="line">(<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>, <span class="number">10</span>)</span><br></pre></td></tr></table></figure>
+
+<p>生成式的三段式：1. 表达式  2. for 循环变量 in 迭代对象 3. （可选）筛选条件</p>
+<p>注意生成式中表达式是集合时不可省略小括号：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>[x, x * x <span class="keyword">for</span> x <span class="keyword">in</span> a]</span><br><span class="line">  File <span class="string">&quot;&lt;ipython-input-70-63780f60f420&gt;&quot;</span>, line <span class="number">1</span></span><br><span class="line">    [x, x * x <span class="keyword">for</span> x <span class="keyword">in</span> a]</span><br><span class="line">              ^</span><br><span class="line">SyntaxError: invalid syntax</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>[(x, x * x) <span class="keyword">for</span> x <span class="keyword">in</span> a]</span><br><span class="line">[(<span class="number">0</span>, <span class="number">0</span>), (<span class="number">1</span>, <span class="number">1</span>), (<span class="number">2</span>, <span class="number">4</span>), (<span class="number">3</span>, <span class="number">9</span>), (<span class="number">4</span>, <span class="number">16</span>), (<span class="number">5</span>, <span class="number">25</span>), (<span class="number">6</span>, <span class="number">36</span>), (<span class="number">7</span>, <span class="number">49</span>), (<span class="number">8</span>, <span class="number">64</span>), (<span class="number">9</span>, <span class="number">81</span>)]</span><br></pre></td></tr></table></figure>
+
+<p>当然，上面代码的前提条件是有了个a当跳板，实际上不必这么麻烦，直接使用迭代器即可。</p>
+<p>试着将上述代码中的a替换成<code>range(10)</code>或者其他你喜欢的范围，并且试着修改左边的表达式、为右边添加筛选条件，看看结果与你想的是否一致。</p>
+<h3 id="2-流程控制"><a href="#2-流程控制" class="headerlink" title="2. 流程控制"></a>2. 流程控制</h3><h4 id="2-0-代码块"><a href="#2-0-代码块" class="headerlink" title="2.0. 代码块"></a>2.0. 代码块</h4><p>代码块（code block）是个比较重要的层级概念，<del>众所周知</del>Python是no brace的，没有打括号进行显式地分块，因此它分块需要特别的手段：冒号配合缩进。</p>
+<p>缩进的使用有一套很完善的规则，但我不准备在这里讲解（混用缩进既不符合工程规范也不能显得作者水平很高），在这里记住一个原则，缩进统一使用tab或者四个空格（如果你是双空格党，那是你的自由）作为一级，每当多一层层级嵌套时便会多一个tab&#x2F;四个空格。</p>
+<p>我们不妨先写出如下伪码（下划线表示空格，注意冒号是认真的）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">定义一个函数：</span><br><span class="line">____写点代码</span><br><span class="line">____开始一个循环：</span><br><span class="line">________循环体代码第一行</span><br><span class="line">________循环体代码第二行</span><br><span class="line">____这与“写点代码”同级</span><br><span class="line">____这里也可以定义一个函数：</span><br><span class="line">________函数体代码的唯一一行</span><br><span class="line"></span><br><span class="line">这行代码与“定义一个函数”同级</span><br></pre></td></tr></table></figure>
+
+<p>老段子：据说Python程序员工作时都带着一把游标卡尺。</p>
+<p>注意在交互式窗口运行（非IPython）时，写完一个代码块要多敲一个空行，否则会报错，例如：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> <span class="number">1</span> == <span class="number">1</span>:</span><br><span class="line">    <span class="built_in">print</span>(<span class="number">1</span>)</span><br><span class="line"><span class="built_in">print</span>(<span class="number">2</span>)</span><br></pre></td></tr></table></figure>
+
+<p>就是错误的，在工程文件中同样应该注意适当空行，虽然不是语法要求，但涉及到美观的问题（主要是指定义函数、类等代码块之后）。</p>
+<h4 id="2-1-条件分支"><a href="#2-1-条件分支" class="headerlink" title="2.1. 条件分支"></a>2.1. 条件分支</h4><p>注意Python中对小括号的依赖减少了，但是对空格的依赖大大增长：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = <span class="number">1</span></span><br><span class="line"><span class="keyword">if</span> a == <span class="number">1</span>:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&#x27;a is 1&#x27;</span>)</span><br><span class="line"><span class="keyword">elif</span> a == <span class="number">0</span>:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&#x27;a is 0&#x27;</span>)</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&#x27;wtf is a?&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>当然，<code>else</code>和<code>elif</code>都是可选的，<code>elif</code>可以拆成<code>else:</code>和<code>if</code>，但这太蠢了，它会长得像这个样子：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = <span class="number">1</span></span><br><span class="line"><span class="keyword">if</span> a == <span class="number">1</span>:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&#x27;a is 1&#x27;</span>)</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    <span class="keyword">if</span> a == <span class="number">0</span>:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&#x27;a is 0&#x27;</span>)</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&#x27;wtf is a?&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>多层的嵌套会导致左边出现大量的缩进，所幸在 IDE&#x2F;编辑器插件 的帮助下这不会为编程带来太大困难，但是仍然观感很差，这种情况下建议使用函数“转移矛盾”。</p>
+<p>但是话说回来，任何一种语言多层嵌套总不能完全不缩进吧，多层嵌套无论如何都是会影响阅读的，其实并不只是因为Python层级关系依赖缩进的锅。</p>
+<h4 id="2-2-循环"><a href="#2-2-循环" class="headerlink" title="2.2. 循环"></a>2.2. 循环</h4><p>Python同样支持<code>while</code>循环与<code>for</code>循环：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">current, then = <span class="number">0</span>, <span class="number">1</span></span><br><span class="line"><span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">1000</span>):</span><br><span class="line">    current, then = then, current + then</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(current)   <span class="comment"># 计算斐波那契数列第1000项</span></span><br></pre></td></tr></table></figure>
+
+<p>此外关于数组等均可以用于<code>for</code>循环迭代，比较特别的是字符串也可以迭代：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = <span class="string">&#x27;hello world&#x27;</span></span><br><span class="line"><span class="keyword">for</span> c <span class="keyword">in</span> a:</span><br><span class="line">    <span class="built_in">print</span>(c)</span><br></pre></td></tr></table></figure>
+
+<p>Tip：如果你在交互式命令行里写带层次的代码，那么写完最后一个层次后要连按两次回车（即留出一个空行），否则会报错。</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">a = <span class="number">10</span></span><br><span class="line"><span class="keyword">while</span> <span class="number">2</span> &lt;= a &lt; <span class="number">20</span>:    <span class="comment"># 语法糖，这种写法是被建议使用的</span></span><br><span class="line">    <span class="built_in">print</span>(a)</span><br><span class="line">    a -= <span class="number">1</span>            <span class="comment"># 注意Python中没有自增1和自减1运算符</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="3-函数"><a href="#3-函数" class="headerlink" title="3. 函数"></a>3. 函数</h3><p>函数的概念想必大家都了解了，这里不再赘述，直接上例子见证语法：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">fib</span>(<span class="params">n</span>):</span><br><span class="line">    current, then = <span class="number">0</span>, <span class="number">1</span></span><br><span class="line">    <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(n):</span><br><span class="line">        current, then = then, current + then</span><br><span class="line">    <span class="keyword">return</span> current</span><br></pre></td></tr></table></figure>
+
+<p>注意第一行固定格式<code>def &lt;func_name&gt;(params,...):</code>，其他和C&#x2F;C++差别不大。作为动态类型语言，函数返回值不固定，可以多个return在不同情况下返回不同值，或者没有return（等价于<code>return None</code>）</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">fib</span>(<span class="params">n</span>):</span><br><span class="line">    <span class="comment"># 这个代码逻辑很差劲，但是能说明关于return None的问题</span></span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> <span class="built_in">isinstance</span>(n, <span class="built_in">int</span>):</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br><span class="line">    <span class="keyword">if</span> n &lt; <span class="number">0</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br><span class="line">    <span class="keyword">if</span> n &lt; <span class="number">1000</span>:</span><br><span class="line">        current, then = <span class="number">0</span>, <span class="number">1</span></span><br><span class="line">        <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(n):</span><br><span class="line">            current, then = then, current + then</span><br><span class="line">        <span class="keyword">return</span> current</span><br><span class="line">    <span class="comment"># n &gt;= 1000 的情况没有显式的处理，其实是return None了</span></span><br></pre></td></tr></table></figure>
+
+<p>此外函数传参本质上和赋值号是一样的，他们都是浅复制，结合基本类型章节的内容考虑下这是为什么。</p>
+<p>可以按照如下的方式指定参数和返回值的类型，但是并不起到约束作用，只是给程序员自己看的：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">fib</span>(<span class="params">n: <span class="built_in">int</span></span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    current, then = <span class="number">0</span>, <span class="number">1</span></span><br><span class="line">    <span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(n):</span><br><span class="line">        current, then = then, current + then</span><br><span class="line">    <span class="keyword">return</span> current</span><br></pre></td></tr></table></figure>
+
+<p>扩展阅读：自学参数中<code>*</code>, <code>**</code>等字符的作用</p>
+<p>当然，输入输出函数绝对应当拥有姓名：</p>
+<ul>
+<li><code>input</code>：从标准输入读入<strong>一行</strong>字符串，可以提供一个字符串当作提示语。在工程中几乎用不到（当然C++的cin在工程中也几乎用不到）</li>
+<li><code>print</code>：打印一句话到指定文件，文件缺省值为<code>sys.stdout</code>，表示到标准输出。参数自行了解，打印原理是调用对象的<code>__str__</code>函数将它转成字符串</li>
+</ul>
+<h4 id="3-1-lambda表达式"><a href="#3-1-lambda表达式" class="headerlink" title="3.1. lambda表达式"></a>3.1. lambda表达式</h4><p>和很多语言一样，Python中可以使用lambda表达式完成一些简单的逻辑，但比较特殊的地方在于，Python中lambda表达式必须只由一个表达式构成，这个表达式的值也就是lambda表达式的返回值。</p>
+<p>lambda表达式实际上构造了一个函数对象，因此可以作为变量或者参数、返回值等传递：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">add = <span class="keyword">lambda</span> a, b: a + b</span><br><span class="line">a = add(<span class="number">1</span>, <span class="number">2</span>)    <span class="comment"># a = 3</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">nums = [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>]</span><br><span class="line">nums.sort(key=<span class="keyword">lambda</span> a: <span class="built_in">abs</span>(<span class="number">5</span>-a))    <span class="comment"># nums = [5, 4, 6, 3, 7, 2, 8, 1, 9]</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">lambda_test</span>():</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">lambda</span> x: x + <span class="number">5</span></span><br><span class="line">a = lambda_test()(<span class="number">5</span>) <span class="comment"># a = 10</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="4-OOP"><a href="#4-OOP" class="headerlink" title="4. OOP"></a>4. OOP</h3><h4 id="4-1-作用域"><a href="#4-1-作用域" class="headerlink" title="4.1. 作用域"></a>4.1. 作用域</h4><p>Python中的类基础用法比C&#x2F;C++更简洁一些，首先介绍一点没什么卵用但是可以预防一些可能的bug的作用域的知识：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">A</span>:</span><br><span class="line">    <span class="keyword">pass</span>  <span class="comment"># pass用于一个块必须存在，但是你又不想写任何语句的时候，作为占位符</span></span><br><span class="line"></span><br><span class="line">A.b = <span class="number">1</span>   <span class="comment"># 为类型 A 动态添加公有成员变量 b</span></span><br><span class="line"><span class="built_in">print</span>(A.b)</span><br><span class="line">a = A()   <span class="comment"># 实例化 A</span></span><br><span class="line"><span class="built_in">print</span>(A.b)</span><br><span class="line">a.b = <span class="number">3</span>   <span class="comment"># 为对象 a 添加了公有成员 b</span></span><br><span class="line"><span class="built_in">print</span>(a.b)</span><br><span class="line"><span class="built_in">print</span>(A.b)</span><br><span class="line"><span class="keyword">del</span> a.b   <span class="comment"># del 可以删除一个变量，这里删掉了 a 的成员 b</span></span><br><span class="line"><span class="built_in">print</span>(a.b)</span><br></pre></td></tr></table></figure>
+
+<h4 id="4-2-类成员函数"><a href="#4-2-类成员函数" class="headerlink" title="4.2. 类成员函数"></a>4.2. 类成员函数</h4><figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">A</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, a, b</span>):</span><br><span class="line">        <span class="comment"># 这里是构造函数</span></span><br><span class="line">        self.a = a</span><br><span class="line">        self.b = b</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">print</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="comment"># 注意，这里没有任何递归的意思</span></span><br><span class="line">        <span class="built_in">print</span>(self.a)</span><br><span class="line">        <span class="built_in">print</span>(self.b)</span><br><span class="line"></span><br><span class="line">a = A(<span class="number">1</span>, <span class="number">2</span>)</span><br><span class="line"><span class="built_in">print</span>(a.a)</span><br><span class="line"><span class="built_in">print</span>(a.b)</span><br><span class="line">a.<span class="built_in">print</span>()</span><br></pre></td></tr></table></figure>
+
+<p>注意类的所有成员函数第一个参数必须是self，原则上你可以给它起任何名字，它将起到和C++中this类似的作用。不加self的变量、函数会被视作局部或全局的变量、函数，但是不会视作类成员，你需要显示地指出self。</p>
+<p>另外Python不支持函数重载（支持虚函数，除了特殊前缀外默认都是虚函数），构造函数必然只有一个，但是你可以提供动态的参数列表，见函数章节的扩展阅读部分。</p>
+<p>（不要问析构函数，我们很少在Python中用到析构，就像你很少在Python代码里见到<code>del</code>，有需要的话我们会用上下文管理器替代析构函数的职能，这涉及<code>with</code>部分，自学）</p>
+<h4 id="4-3-类继承"><a href="#4-3-类继承" class="headerlink" title="4.3. 类继承"></a>4.3. 类继承</h4><p>Python的类继承默认都是公有继承，迫于时间这部分直接跳过。</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">A</span>(parent_class_1, parent_class_2):</span><br><span class="line">    <span class="keyword">pass</span></span><br></pre></td></tr></table></figure>
+
+<p>如果你对于构造函数的初始化有所疑问，学习一下<code>super().__init()</code>或许能解决你的一些疑问。</p>
+<h4 id="4-4-运算符重载"><a href="#4-4-运算符重载" class="headerlink" title="4.4. 运算符重载"></a>4.4. 运算符重载</h4><p>Python的运算符重载很特别，都是写成函数的成员函数的形式，函数名比较特别，下面介绍一个例子，大家触类旁通即可（还记得前面介绍运算符里的一堆<code>__xxx__</code>吗？可供查阅）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">A</span>():</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, a</span>):</span><br><span class="line">        self.a = a</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__add__</span>(<span class="params">self, other</span>):</span><br><span class="line">        <span class="keyword">if</span> <span class="built_in">isinstance</span>(other, A):</span><br><span class="line">            <span class="keyword">return</span> A(self.a + other.a)</span><br><span class="line">        <span class="keyword">elif</span> <span class="built_in">isinstance</span>(other, <span class="built_in">int</span>):</span><br><span class="line">            <span class="keyword">return</span> A(self.a + other)</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">None</span>    <span class="comment"># 非标准处理手段，标准方法是抛出异常，但是我们没空讲异常了</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__str__</span>(<span class="params">self</span>):     <span class="comment"># 重载 str(obj) 函数</span></span><br><span class="line">        <span class="keyword">return</span> <span class="string">&#x27;A: %d&#x27;</span> % self.a</span><br><span class="line"></span><br><span class="line">a = A(<span class="number">1</span>)</span><br><span class="line">b = A(<span class="number">2</span>)</span><br><span class="line">c = a + b</span><br><span class="line">d = c + <span class="number">10</span></span><br><span class="line"><span class="built_in">print</span>(c.a)</span><br><span class="line"><span class="built_in">print</span>(d)</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-文件操作"><a href="#5-文件操作" class="headerlink" title="5. 文件操作"></a>5. 文件操作</h3><p>文件操作也是比较重要的基础，何况网上充斥着一键读入全文件的**代码，因此有必要强调一下。</p>
+<p>首先相信大家都有了C文件操作基础（以及之前讲Linux应该也有说），因此这里略过相对路径、打开方式等不谈，首先在终端中执行指令构造一个简单文件：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">echo</span> -e <span class="string">&quot;123\n456\n789&quot;</span> &gt; temp.txt</span><br></pre></td></tr></table></figure>
+
+<p>（或者手动创建，第一行123，第二行456，第三行789）</p>
+<p>然后再到Python中进行操作：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">file = <span class="built_in">open</span>(<span class="string">&#x27;temp.txt&#x27;</span>)     <span class="comment"># 注意此处相当于 open(&#x27;temp.txt&#x27;, &#x27;r&#x27;)，其中&#x27;r&#x27;表示读取</span></span><br><span class="line">line1 = file.readline()</span><br><span class="line">lines = file.readlines()</span><br><span class="line">file.close()</span><br><span class="line"><span class="built_in">print</span>(line1)</span><br><span class="line"><span class="built_in">print</span>(lines)</span><br></pre></td></tr></table></figure>
+
+<p>注意前面提到上下文管理器，在读写文件时就非常有用，可以避免由于忘记关闭文件导致丢失数据：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">with</span> <span class="built_in">open</span>(<span class="string">&#x27;temp.txt&#x27;</span>) <span class="keyword">as</span> file:</span><br><span class="line">    line1 = file.readline()</span><br><span class="line">    lines = file.readlines()</span><br><span class="line">    <span class="comment"># 这里 file 会被自动 close 掉</span></span><br><span class="line"><span class="built_in">print</span>(line1)</span><br><span class="line"><span class="built_in">print</span>(lines)</span><br></pre></td></tr></table></figure>
+
+<p>不过这还是太简单了点，下面用bash加点料：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">echo</span> -e <span class="string">&quot;你好世界&quot;</span> &gt;&gt; temp.txt</span><br></pre></td></tr></table></figure>
+
+<p>再到Python操作：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">data = <span class="built_in">open</span>(<span class="string">&#x27;temp.txt&#x27;</span>).read()   <span class="comment"># 此时有没有显式关闭并不重要，因为临时变量被析构时文件数据也被清除了</span></span><br><span class="line"><span class="built_in">print</span>(data)</span><br></pre></td></tr></table></figure>
+
+<p>它执行成功了吗？我不知道，因为我无法确定你的终端编码与你的Python默认编码是否一致（事实上在Windows的终端中执行<code>echo -e</code>是错误的）。在我的电脑上它可能等价于：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">data = <span class="built_in">open</span>(<span class="string">&#x27;temp.txt&#x27;</span>, encoding=<span class="string">&#x27;utf-8&#x27;</span>).read()</span><br><span class="line"><span class="built_in">print</span>(data)</span><br></pre></td></tr></table></figure>
+
+<p>但是在Windows电脑上，它或许等价于</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">data = <span class="built_in">open</span>(<span class="string">&#x27;temp.txt&#x27;</span>, encoding=<span class="string">&#x27;gbk&#x27;</span>).read()</span><br><span class="line"><span class="built_in">print</span>(data)</span><br></pre></td></tr></table></figure>
+
+<p>Anyway，你应当自己保证或让提供文件的人保证文件的编码是什么，否则你将需要一些手段（库）来推测编码。</p>
+<p>此外，介绍一点比较高效的操作（这部分代码可比CSDN上通篇的全部读取有价值多了）：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="keyword">with</span> <span class="built_in">open</span>(<span class="string">&#x27;temp.txt&#x27;</span>) <span class="keyword">as</span> file:</span><br><span class="line">    <span class="keyword">for</span> line <span class="keyword">in</span> file:    <span class="comment"># 使用迭代器按行读取，效率比全文读取高得多，想象一下如果这文件几个G</span></span><br><span class="line">        <span class="built_in">print</span>(line)</span><br></pre></td></tr></table></figure>
+
+<p>二进制文件的操作略去（注意二进制文件显然不应该指定编码），文件的写入略去。</p>
+<h3 id="6-库"><a href="#6-库" class="headerlink" title="6. 库"></a>6. 库</h3><p>Python的一大优势在于它的第三方库真的很多，使得很多事情很容易完成。实际上你也很容易将自己写的代码封装成库。<del>比如说我自己写了访问树洞的库（然而API更新了我还没改）</del>这样的例子有很多，下一节Python应用中会举几个例子来说明。下面先讲库的使用。</p>
+<p>这里涉及的几个概念分别是script、module、package，这些概念自行学习。</p>
+<p>所谓库，或者也叫包（但至少日常聊天时我们不会提模块），是指Python内部提供或其他开源社区贡献者提供的一些代码，可以用来直接调用，譬如C++有内置库&lt;iostream&gt;，C有&lt;stdio.h&gt;，Python有json、http这样的内置库，此外Python的第三方库安装非常简单（见参考资料）。</p>
+<p>下面以json为例：</p>
+<p>考虑一下如何把一个字典保存在文件里？</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">d = &#123;<span class="string">&#x27;姓名&#x27;</span>: <span class="string">&#x27;张三&#x27;</span>, <span class="string">&#x27;年龄&#x27;</span>: <span class="number">18</span>, <span class="string">&#x27;生日&#x27;</span>: <span class="literal">None</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这就是一个字典，直接写到文件里是行不通的，文件只能写字节串或者字符串，你需要转化它，一个可能的方法是用<code>str(d)</code>，如果你想到了这个操作，那很好，但是还不够，因为我们缺少一个手段将字符串转化回字典（这被称作序列化和反序列化）。json库正为我们提供了这样的手段</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 引入整个库</span></span><br><span class="line"><span class="keyword">import</span> json</span><br><span class="line">json.dump(d, <span class="built_in">open</span>(<span class="string">&#x27;data.json&#x27;</span>, <span class="string">&#x27;w&#x27;</span>))</span><br><span class="line">data = json.load(<span class="built_in">open</span>(<span class="string">&#x27;data.json&#x27;</span>))</span><br></pre></td></tr></table></figure>
+
+<p>或许你会很好奇data.json里面是些什么：</p>
+<figure class="highlight json"><table><tr><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span><span class="attr">&quot;\u59d3\u540d&quot;</span><span class="punctuation">:</span> <span class="string">&quot;\u5f20\u4e09&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;\u5e74\u9f84&quot;</span><span class="punctuation">:</span> <span class="number">18</span><span class="punctuation">,</span> <span class="attr">&quot;\u751f\u65e5&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">null</span></span><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>这是什么鬼？哦这是Unicode，真不是给人看的东西……不过没关系，我们很容易把它改成给人看的：</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line">json.dump(d, <span class="built_in">open</span>(<span class="string">&#x27;data.json&#x27;</span>, <span class="string">&#x27;w&#x27;</span>), ensure_ascii=<span class="literal">False</span>)</span><br></pre></td></tr></table></figure>
+
+<p>再来看看文件里的东西吧：</p>
+<figure class="highlight json"><table><tr><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span><span class="attr">&quot;姓名&quot;</span><span class="punctuation">:</span> <span class="string">&quot;张三&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;年龄&quot;</span><span class="punctuation">:</span> <span class="number">18</span><span class="punctuation">,</span> <span class="attr">&quot;生日&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">null</span></span><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>这次看上去是不是好多了？注意那个null，这是JavaScript的写法，毕竟json的全称是JavaScript Object Notation。</p>
+<p>还有一些额外的语法</p>
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 引入库并起别名</span></span><br><span class="line"><span class="keyword">import</span> json <span class="keyword">as</span> js</span><br><span class="line">js.dump(d, <span class="built_in">open</span>(<span class="string">&#x27;data.json&#x27;</span>, <span class="string">&#x27;w&#x27;</span>), ensure_ascii=<span class="literal">False</span>)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 引入一部分内容（当然也可以别名）</span></span><br><span class="line"><span class="keyword">from</span> json <span class="keyword">import</span> dump</span><br><span class="line">dump(d, <span class="built_in">open</span>(<span class="string">&#x27;data.json&#x27;</span>, <span class="string">&#x27;w&#x27;</span>), ensure_ascii=<span class="literal">False</span>)</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight python"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 可以引入多个部分</span></span><br><span class="line"><span class="keyword">from</span> json <span class="keyword">import</span> dump, load</span><br><span class="line"><span class="comment"># 也可以使用通配符，但是一般不要这样做</span></span><br><span class="line"><span class="keyword">from</span> json <span class="keyword">import</span> *</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-脚本化"><a href="#7-脚本化" class="headerlink" title="7. 脚本化"></a>7. 脚本化</h3><p>当然，在交互式窗口里写东西只能是玩具级别的手段，你终究和C&#x2F;C++一样写成文件才有足够的复用性。</p>
+<p>执行Python脚本的方法非常简单：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">python filename.py [here maybe some params]</span><br></pre></td></tr></table></figure>
+
+<h3 id="8-深入学习"><a href="#8-深入学习" class="headerlink" title="8. 深入学习"></a>8. 深入学习</h3><h4 id="8-1-入门级"><a href="#8-1-入门级" class="headerlink" title="8.1. 入门级"></a>8.1. 入门级</h4><p>廖雪峰教程：<a href="">https://www.liaoxuefeng.com/wiki/1016959663602400</a></p>
+<p>此处可以看到我有意或无意间忽略的一些基础知识。</p>
+<h4 id="8-2-进阶级"><a href="#8-2-进阶级" class="headerlink" title="8.2. 进阶级"></a>8.2. 进阶级</h4><p>Python Doc（简体中文版）：<a href="">https://docs.python.org/zh-cn/3/contents.html</a></p>
+<p>此处可以看到关于Python的内置库、新特性的详细介绍。此外它同样包含一份新手教程，链接为：<a href="">https://docs.python.org/zh-cn/3/tutorial/index.html</a></p>
+<h4 id="8-3-一些知识点"><a href="#8-3-一些知识点" class="headerlink" title="8.3. 一些知识点"></a>8.3. 一些知识点</h4><p>下面是一些应当拥有姓名，我备课时想到了但完全没时间在文中提及的零碎知识或库：</p>
+<ul>
+<li><del>f-string</del>（rls想到了没讲但是这次讲了）</li>
+<li>@ 装饰器 或 运算符</li>
+<li>os与sys库</li>
+<li>pathlib</li>
+<li>datetime</li>
+<li>argparser<del>（梦回oop）</del></li>
+<li>sorted</li>
+<li>__getattribute__</li>
+<li>并发与并行（多线程、多进程、协程）</li>
+<li>正则</li>
+<li>__main__</li>
+<li>异常抛出与处理</li>
+</ul>
+<p>无论到文档里检索这些东西，还是直接百度，都不失为一种学习手段。Python的热度决定了你在学习它时能够轻松获取大量的材料——但是不要忘了辨别它们。</p>
+<h4 id="8-4-就地取材"><a href="#8-4-就地取材" class="headerlink" title="8.4. 就地取材"></a>8.4. 就地取材</h4><p>在交互式窗口中你可以很方便地就近获取一些东西，包括：</p>
+<ul>
+<li>使用<code>help(obj)</code>函数，查看函数接口，比方说看看基本类型都有些什么函数？</li>
+<li>使用<code>dir(obj_or_type)</code>可以快捷查看一个对象的类（或直接看类）有些什么成员函数。</li>
+</ul>
+<p>如果你使用了Ipython（或Jupyter-notebook），你可以用name? 或name?? 的形式查看接口&#x2F;源码。</p>
+<p>在pycharm中你可以用查看定义的方法（快捷键不确定，我的是Ctrl+鼠标左键）很方便的查看一些库的源码。</p>
+]]></content>
+      <categories>
+        <category>文档</category>
+      </categories>
+      <tags>
+        <tag>Python</tag>
+        <tag>暑培</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Hello World!</title>
+    <url>/2021/07/20/hello-world/</url>
+    <content><![CDATA[<p>写博客这件事情想了很久了，但是一直由于各种原因（主要还是懒）而咕咕咕，今天总算是勉强搭起来，还有很多细节工作需要做，<del>甚至没有想好名字，</del>所以写东西的事继续咕咕咕（×）</p>
+<p>框架和主题都是现成的，但是昨天刚看了holder的blog今天就搭了看起来一模一样的东西也属实有些过分（虽然确实有些配置抄他的），但是主要原因是我想要一个白色背景来衬我的透明图头像，<del>所以只能说如有雷同纯属巧合</del></p>
+]]></content>
+      <categories>
+        <category>更新日志</category>
+      </categories>
+  </entry>
+</search>
